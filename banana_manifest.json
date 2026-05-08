@@ -1,0 +1,106 @@
+{
+  "plugin_version": "8.1.0",
+  "schema_version": 1,
+  "name": "Hrio-Design",
+  "display_name": "Hrio Design 独立设计师节点",
+  "description": "Hrio Design 独立 ComfyUI 插件 v8.1.0：节点 Key 全部改为 Hrio_Design_*，避免与旧 hrio-commerce/Banana 插件冲突；新增 GitHub 自动发布 workflow 和一键推送脚本。",
+  "config_defaults": {
+    "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/hrio_design_manifest.json",
+    "base_url": "https://zheshihouduan.tenx-jingli.cloud/api/",
+    "fallback_base_url": "https://zheshihouduan.tenx-jingli.cloud/api",
+    "model": "banano",
+    "image_size": "2k",
+    "aspect_ratio": "Auto",
+    "verify_ssl": "false",
+    "connect_timeout_sec": "30",
+    "read_timeout_sec": "300",
+    "upload_dir": "shortlinks/qr",
+    "enable_oss": "true",
+    "compress_images": "true",
+    "force_hd": "true",
+    "max_retry_per_view": "8",
+    "retry_interval_sec": "1.5",
+    "veo_poll_interval_sec": "8",
+    "veo_poll_timeout_sec": "1800",
+    "veo_resolution": "1080p",
+    "veo_duration_seconds": "8",
+    "veo_number_of_videos": "1"
+  },
+  "node": {
+    "display_name": "🎨 Hrio Design｜设计师模板面板",
+    "category": "HRIO设计/模板面板",
+    "output_node": true,
+    "optional_image_slots": 10,
+    "model_map": {
+      "banano2": "banano",
+      "banano-pro": "banano-pro",
+      "gemini3.1-pro": "gemini3.1-pro"
+    },
+    "enum_sources": {
+      "model_map": {
+        "banano2": "banano",
+        "banano-pro": "banano-pro",
+        "gemini3.1-pro": "gemini3.1-pro"
+      },
+      "image_size_options": {
+        "1K": "1K",
+        "2K": "2K",
+        "4K": "4K",
+        "8K（默认16:9）": "8K"
+      },
+      "aspect_ratio_options": {
+        "Auto": "Auto",
+        "1:1 (方形)": "1:1",
+        "3:4 (竖屏标准)": "3:4",
+        "4:3 (横屏标准)": "4:3",
+        "9:16 (竖屏/手机)": "9:16",
+        "16:9 (横屏宽幅)": "16:9"
+      },
+      "video_model_map": {
+        "veo3.1": "veo3.1"
+      },
+      "video_resolution_options": {
+        "1080p": "1080p",
+        "720p": "720p"
+      },
+      "video_aspect_ratio_options": {
+        "16:9 (横屏宽幅)": "16:9",
+        "9:16 (竖屏/手机)": "9:16"
+      }
+    }
+  },
+  "ecommerce_three_view": {
+    "display_name": "🎨 Hrio Design｜设计师模板面板",
+    "category": "HRIO设计/模板面板",
+    "prompt_store_path": "banana_designer_prompts.json",
+    "editor_route": "/hrio-design/editor",
+    "editor_html": "web/banana_prompt_editor.html",
+    "mode_options": {
+      "平面｜品牌主视觉 KV": "brand_key_visual",
+      "平面｜活动海报 / 宣传海报": "poster_design",
+      "平面｜社媒封面 / 小红书封面": "social_cover",
+      "平面｜网页首屏 / Banner": "web_hero_banner",
+      "平面｜PPT / 提案封面": "proposal_cover",
+      "平面｜品牌视觉延展": "brand_extension",
+      "室内｜空间风格概念图": "space_style_concept",
+      "室内｜室内氛围渲染": "interior_mood_render",
+      "室内｜材质情绪板": "material_moodboard",
+      "室内｜软装搭配方案": "soft_furnishing_plan",
+      "室内｜墙面 / 地面材质替换": "material_replacement",
+      "室内｜灯光氛围调整": "lighting_mood"
+    },
+    "default_prompt_template": "平面｜品牌主视觉 KV",
+    "default_mode": "平面｜品牌主视觉 KV",
+    "default_model": "banano2",
+    "default_image_size": "4K",
+    "default_aspect_ratio": "16:9 (横屏宽幅)"
+  },
+  "video": {},
+  "independent_node_keys": {
+    "template": "Hrio_Design_Template_Node",
+    "three_view": "Hrio_Design_Three_View_Node",
+    "single_image": "Hrio_Design_Single_Image_Node",
+    "single_video": "Hrio_Design_Single_Video_Node",
+    "video": "Hrio_Design_Video_Node"
+  }
+}

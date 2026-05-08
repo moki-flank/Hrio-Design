@@ -1,0 +1,3138 @@
+<!-- FILE: web/banana_prompt_editor.html -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hrio Design 设计师模板生成</title>
+
+  <style>
+    :root {
+      --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      --bg-url: url("https://img.hrio.site/assets/plu/bg.png");
+      --bg-soft: rgba(241,247,252,.78);
+      --bg-deep: rgba(221,233,244,.92);
+      --panel: rgba(255,255,255,.68);
+      --panel-strong: rgba(255,255,255,.9);
+      --panel-soft: rgba(255,255,255,.48);
+      --ink: #1d334b;
+      --ink-strong: #071d34;
+      --ink-soft: #647488;
+      --muted: #8996a6;
+      --line: rgba(84,110,137,.16);
+      --line-strong: rgba(84,110,137,.28);
+      --brand: #447dff;
+      --brand-2: #8fc5ff;
+      --brand-soft: rgba(68,125,255,.13);
+      --danger: #eb6071;
+      --ok: #21b889;
+      --warn: #e5a142;
+      --shadow: 0 24px 70px rgba(24,48,74,.16);
+      --shadow-soft: 0 12px 30px rgba(24,48,74,.1);
+      --radius-xl: 30px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+    }
+
+    body[data-skin="winter_gray"] {
+      --bg-url: url("https://img.hrio.site/assets/plu/bg.png");
+      --bg-soft: rgba(241,247,252,.78);
+      --bg-deep: rgba(221,233,244,.92);
+      --panel: rgba(255,255,255,.68);
+      --panel-strong: rgba(255,255,255,.9);
+      --panel-soft: rgba(255,255,255,.48);
+      --ink: #1d334b;
+      --ink-strong: #071d34;
+      --ink-soft: #647488;
+      --muted: #8996a6;
+      --line: rgba(84,110,137,.16);
+      --line-strong: rgba(84,110,137,.28);
+      --brand: #447dff;
+      --brand-2: #8fc5ff;
+      --brand-soft: rgba(68,125,255,.13);
+      --shadow: 0 24px 70px rgba(24,48,74,.16);
+      --shadow-soft: 0 12px 30px rgba(24,48,74,.1);
+    }
+
+    body[data-skin="warm_yellow"] {
+      --bg-url: url("https://img.hrio.site/assets/plu/bg2.png");
+      --bg-soft: rgba(255,248,235,.78);
+      --bg-deep: rgba(244,225,194,.9);
+      --panel: rgba(255,252,245,.7);
+      --panel-strong: rgba(255,253,247,.92);
+      --panel-soft: rgba(255,250,240,.52);
+      --ink: #3b2f21;
+      --ink-strong: #21180e;
+      --ink-soft: #79674e;
+      --muted: #9c896f;
+      --line: rgba(151,119,72,.18);
+      --line-strong: rgba(151,119,72,.31);
+      --brand: #c48d45;
+      --brand-2: #efc77e;
+      --brand-soft: rgba(196,141,69,.15);
+      --shadow: 0 24px 70px rgba(94,67,34,.18);
+      --shadow-soft: 0 12px 30px rgba(94,67,34,.11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: var(--font);
+      color: var(--ink);
+    }
+
+    body {
+      background:
+        linear-gradient(180deg, var(--bg-soft), var(--bg-deep)),
+        var(--bg-url);
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 10% 5%, rgba(255,255,255,.82), transparent 26%),
+        radial-gradient(circle at 84% 6%, var(--brand-soft), transparent 32%),
+        linear-gradient(90deg, rgba(255,255,255,.22) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.18) 1px, transparent 1px);
+      background-size: auto, auto, 76px 76px, 76px 76px;
+      opacity: .72;
+      mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.76) 62%, transparent 100%);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      user-select: none;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1680px, calc(100vw - 24px));
+      height: 100vh;
+      margin: 0 auto;
+      padding: 12px 0 10px;
+      display: grid;
+      grid-template-rows: 64px minmax(0, 1fr) 22px;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .topbar {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, .9fr) minmax(120px, .35fr) auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 50px;
+      height: 50px;
+      flex: 0 0 auto;
+      border-radius: 19px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.96), rgba(255,255,255,.5)),
+        linear-gradient(135deg, var(--brand-soft), transparent);
+      border: 1px solid rgba(255,255,255,.78);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .brand-mark svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .brand-title {
+      margin: 0;
+      color: var(--ink-strong);
+      font-size: 22px;
+      line-height: 1.06;
+      letter-spacing: -.045em;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .brand-sub {
+      margin-top: 5px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .top-center {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .skin-toggle {
+      width: 132px;
+      height: 50px;
+      padding: 5px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.78);
+      background: rgba(255,255,255,.52);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(22px);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+      flex: 0 0 auto;
+    }
+
+    .skin-toggle button {
+      position: relative;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+      transition: .18s ease;
+      white-space: nowrap;
+    }
+
+    .skin-toggle button.active {
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--brand) 24%, transparent);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .btn {
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+      box-shadow: 0 7px 18px rgba(23,50,77,.06);
+      transition: .16s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 12px 26px rgba(23,50,77,.11);
+    }
+
+    .btn.primary {
+      color: #fff;
+      border-color: rgba(255,255,255,.55);
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 14px 28px color-mix(in srgb, var(--brand) 26%, transparent);
+    }
+
+    .btn.primary.dirty {
+      box-shadow:
+        0 0 0 4px var(--brand-soft),
+        0 14px 28px color-mix(in srgb, var(--brand) 26%, transparent);
+    }
+
+    .btn.danger {
+      color: #fff;
+      border-color: rgba(255,255,255,.55);
+      background: linear-gradient(135deg, #f17783, var(--danger));
+    }
+
+    .btn.ok {
+      color: #fff;
+      border-color: rgba(255,255,255,.55);
+      background: linear-gradient(135deg, #1fb882, #77dcbc);
+    }
+
+    .btn.warn {
+      color: #fff;
+      border-color: rgba(255,255,255,.55);
+      background: linear-gradient(135deg, #e6a13f, #f2c36e);
+    }
+
+    .btn.small {
+      height: 31px;
+      padding: 0 10px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(228px, .72fr) minmax(360px, 1.16fr) minmax(360px, 1fr);
+      gap: 12px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    @media (min-width: 921px) {
+      html,
+      body {
+        overflow: hidden;
+      }
+
+      .page {
+        min-width: 980px;
+      }
+
+      .topbar,
+      .workspace {
+        width: 100%;
+      }
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(255,255,255,.72);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.78), rgba(255,255,255,.46)),
+        var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px);
+    }
+
+    .left-panel {
+      padding: 15px;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      gap: 12px;
+    }
+
+    .panel-title {
+      margin: 0;
+      color: var(--ink-strong);
+      font-size: 19px;
+      line-height: 1.12;
+      letter-spacing: -.035em;
+      font-weight: 950;
+    }
+
+    .panel-desc {
+      margin: 6px 0 0;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 730;
+    }
+
+    .designer-switch {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 6px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.72);
+      background: rgba(255,255,255,.45);
+    }
+
+    .designer-btn {
+      height: 42px;
+      border-radius: 15px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 13px;
+      font-weight: 950;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .designer-btn.active {
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 12px 24px color-mix(in srgb, var(--brand) 22%, transparent);
+    }
+
+    .mode-list {
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding-right: 2px;
+      scrollbar-width: none;
+    }
+
+    .mode-list::-webkit-scrollbar,
+    .prompt-tabs::-webkit-scrollbar,
+    .runtime-grid::-webkit-scrollbar,
+    .modal::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    .mode-card {
+      width: 100%;
+      min-height: 62px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.54);
+      color: var(--ink);
+      cursor: pointer;
+      padding: 9px 10px;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 9px;
+      align-items: center;
+      text-align: left;
+      transition: .16s ease;
+    }
+
+    .mode-card:hover {
+      background: rgba(255,255,255,.88);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .mode-card.active {
+      color: #fff;
+      border-color: rgba(255,255,255,.66);
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 14px 28px color-mix(in srgb, var(--brand) 22%, transparent);
+    }
+
+    .mode-sign {
+      width: 34px;
+      height: 34px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 950;
+      font-size: 13px;
+    }
+
+    .mode-card.active .mode-sign {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+    }
+
+    .mode-text {
+      min-width: 0;
+    }
+
+    .mode-text strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.14;
+      font-weight: 950;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mode-text span {
+      display: block;
+      margin-top: 4px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.22;
+      font-weight: 760;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mode-card.active .mode-text span {
+      color: rgba(255,255,255,.84);
+    }
+
+    .config-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.48);
+    }
+
+    .config-card strong {
+      color: var(--ink-strong);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .config-line {
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.45;
+      font-weight: 720;
+      word-break: break-word;
+    }
+
+    .mode-tools {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .editor-panel {
+      padding: 15px;
+      display: grid;
+      grid-template-rows: auto minmax(240px, 1fr) auto;
+      gap: 10px;
+    }
+
+    .prompt-tabs {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding-bottom: 1px;
+      scrollbar-width: none;
+    }
+
+    .prompt-tab {
+      flex: 0 0 auto;
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: .16s ease;
+    }
+
+    .prompt-tab.active {
+      color: #fff;
+      border-color: rgba(255,255,255,.58);
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--brand) 18%, transparent);
+    }
+
+    .prompt-editor-card {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 9px;
+      padding: 12px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.74);
+      background: rgba(255,255,255,.5);
+    }
+
+    .prompt-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .prompt-card-head strong {
+      color: var(--ink-strong);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .field-name {
+      color: var(--ink-soft);
+      background: var(--brand-soft);
+      border: 1px solid color-mix(in srgb, var(--brand) 16%, transparent);
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      resize: none;
+      outline: none;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.76);
+      color: var(--ink-strong);
+      padding: 14px;
+      line-height: 1.62;
+      font-size: 13px;
+      font-weight: 650;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.82);
+    }
+
+    textarea:focus {
+      border-color: color-mix(in srgb, var(--brand) 48%, white);
+      background: rgba(255,255,255,.92);
+      box-shadow:
+        0 0 0 4px var(--brand-soft),
+        inset 0 1px 0 rgba(255,255,255,.9);
+    }
+
+    .editor-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      font-weight: 760;
+    }
+
+    .tips-card {
+      min-height: 56px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.44);
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .tips-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .tips-label {
+      color: var(--ink-strong);
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .tips-preview {
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.48;
+      font-weight: 740;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .preview-panel {
+      padding: 15px;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    .preview-switch {
+      height: 38px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .preview-switch button {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+      transition: .16s ease;
+    }
+
+    .preview-switch button.active {
+      color: #fff;
+      border-color: rgba(255,255,255,.58);
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: 0 10px 22px color-mix(in srgb, var(--brand) 18%, transparent);
+    }
+
+    .preview-content {
+      min-height: 0;
+      overflow: hidden;
+      display: grid;
+    }
+
+    .template-viewer {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 112px;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .preview-stage {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.82);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.68)),
+        radial-gradient(circle at 50% 28%, var(--brand-soft), transparent 40%);
+      box-shadow: 0 16px 34px rgba(23,50,77,.1);
+      cursor: zoom-in;
+    }
+
+    .preview-main-img {
+      width: 100%;
+      height: 100%;
+      min-height: 260px;
+      object-fit: contain;
+      display: block;
+      padding: 10px;
+    }
+
+    .preview-badge {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      max-width: calc(100% - 74px);
+      height: 31px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(255,255,255,.82);
+      color: var(--ink-strong);
+      font-size: 12px;
+      font-weight: 950;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 18px rgba(23,50,77,.08);
+      z-index: 5;
+    }
+
+    .preview-upload-icon {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      width: 36px;
+      height: 36px;
+      z-index: 6;
+      border-radius: 14px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      border: 1px solid rgba(255,255,255,.7);
+      box-shadow: 0 10px 24px color-mix(in srgb, var(--brand) 26%, transparent);
+      backdrop-filter: blur(14px);
+      transition: .16s ease;
+    }
+
+    .preview-upload-icon:hover {
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 14px 30px color-mix(in srgb, var(--brand) 34%, transparent);
+    }
+
+    .preview-upload-icon svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    .thumb-row {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .thumb-card {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.78);
+      background: rgba(255,255,255,.66);
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(23,50,77,.08);
+      transition: .16s ease;
+    }
+
+    .thumb-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(23,50,77,.12);
+    }
+
+    .thumb-card.active {
+      box-shadow:
+        0 0 0 4px var(--brand-soft),
+        0 16px 34px rgba(23,50,77,.14);
+      border-color: color-mix(in srgb, var(--brand) 36%, white);
+    }
+
+    .thumb-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: saturate(.98);
+    }
+
+    .thumb-card.active img {
+      filter: saturate(1.08) contrast(1.02);
+    }
+
+    .thumb-card span {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 7px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(255,255,255,.78);
+      color: var(--ink-strong);
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 950;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      backdrop-filter: blur(12px);
+    }
+
+    .runtime-grid {
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      padding-right: 2px;
+      scrollbar-width: none;
+    }
+
+    .runtime-group {
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.76);
+      background: rgba(255,255,255,.46);
+      padding: 10px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .runtime-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .runtime-group-head strong {
+      color: var(--ink-strong);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .runtime-group-head span {
+      color: var(--ink-soft);
+      font-size: 11px;
+      font-weight: 780;
+    }
+
+    .runtime-body {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .runtime-view {
+      position: relative;
+      height: 150px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.78);
+      background: rgba(255,255,255,.7);
+      cursor: pointer;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .runtime-view img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .runtime-view.failed,
+    .runtime-view.error {
+      border-color: rgba(235,96,113,.45);
+      background: rgba(255,238,241,.76);
+    }
+
+    .runtime-view span {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 7px;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.84);
+      color: var(--ink-strong);
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 950;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      backdrop-filter: blur(12px);
+    }
+
+    .placeholder {
+      min-height: 200px;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      text-align: center;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.6;
+      font-weight: 850;
+      background: rgba(255,255,255,.54);
+      border-radius: 22px;
+      border: 1px solid var(--line);
+    }
+
+    .preview-footer {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.78);
+      background: rgba(255,255,255,.46);
+    }
+
+    .preview-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px 10px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.35;
+      font-weight: 780;
+    }
+
+    .preview-summary span {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .preview-summary b {
+      color: var(--ink-strong);
+      font-weight: 950;
+    }
+
+    .preview-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .preview-actions .btn {
+      min-width: 0;
+      width: 100%;
+      padding: 0 10px;
+    }
+
+    .auto-retry {
+      height: 38px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .auto-retry input {
+      margin: 0;
+      accent-color: var(--brand);
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 1px 8px rgba(0,0,0,.12);
+      font-size: 12px;
+      font-weight: 850;
+      min-width: 0;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 80;
+      right: 22px;
+      bottom: 22px;
+      width: min(430px, calc(100vw - 44px));
+      min-height: 48px;
+      padding: 12px 15px;
+      border-radius: 18px;
+      color: var(--ink-strong);
+      background: rgba(255,255,255,.9);
+      border: 1px solid rgba(255,255,255,.88);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+      opacity: 0;
+      transform: translateY(14px);
+      pointer-events: none;
+      transition: .2s ease;
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 850;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .modal-mask {
+      position: fixed;
+      z-index: 70;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 26px;
+      background: rgba(217,229,240,.58);
+      backdrop-filter: blur(12px);
+    }
+
+    .modal-mask.show {
+      display: grid;
+    }
+
+    .modal {
+      width: min(980px, calc(100vw - 52px));
+      max-height: min(860px, calc(100vh - 52px));
+      overflow: auto;
+      border-radius: 28px;
+      padding: 18px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(255,255,255,.9);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 13px;
+    }
+
+    .modal-head,
+    .modal-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .modal-head strong {
+      color: var(--ink-strong);
+      font-size: 18px;
+      font-weight: 950;
+    }
+
+    .modal-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+      gap: 13px;
+      min-height: 0;
+    }
+
+    .modal-image {
+      min-height: 430px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .modal-image img {
+      width: 100%;
+      height: 100%;
+      max-height: calc(100vh - 260px);
+      object-fit: contain;
+      display: block;
+    }
+
+    .modal-text {
+      min-height: 180px;
+      max-height: calc(100vh - 260px);
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.62);
+      color: var(--ink);
+      padding: 13px;
+      font-size: 12px;
+      line-height: 1.62;
+      font-weight: 720;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .form-row {
+      display: grid;
+      gap: 6px;
+    }
+
+    .form-row label {
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .form-row input,
+    .form-row select,
+    .form-row textarea {
+      width: 100%;
+      min-height: 38px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      outline: none;
+      padding: 9px 11px;
+      background: rgba(255,255,255,.78);
+      color: var(--ink-strong);
+      font-size: 13px;
+      font-weight: 720;
+    }
+
+    .form-row textarea {
+      min-height: 74px;
+      resize: vertical;
+    }
+
+    @media (max-width: 920px) {
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .page {
+        height: auto;
+        min-height: 100vh;
+        grid-template-rows: auto auto 26px;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .top-center,
+      .top-actions {
+        justify-content: flex-start;
+        overflow-x: auto;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+
+      textarea {
+        min-height: 420px;
+      }
+
+      .template-viewer {
+        min-height: 620px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        width: calc(100vw - 18px);
+      }
+
+      .designer-switch,
+      .runtime-body,
+      .preview-summary,
+      .preview-actions,
+      .thumb-row,
+      .modal-body {
+        grid-template-columns: 1fr;
+      }
+
+      .brand-title {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body data-skin="winter_gray">
+  <div class="page">
+    <header class="topbar">
+      <section class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none">
+            <path d="M10 42c12-2 19-9 22-21 7 6 10 16 6 25-4 10-15 14-28 12 4-5 5-10 0-16Z" fill="var(--brand)"/>
+            <path d="M34 8c8 4 14 10 18 18-9-1-17 2-23 9-2-11 0-20 5-27Z" fill="var(--brand-2)"/>
+            <path d="M19 47c17-9 25-20 28-34" stroke="var(--ink-strong)" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Hrio Design 设计师模板生成</h1>
+          <div class="brand-sub">平面设计 · 室内设计 · OSS 预览 · 真实重试</div>
+        </div>
+      </section>
+
+      <section class="top-center">
+        <div class="skin-toggle">
+          <button data-skin="winter_gray" class="active">冬</button>
+          <button data-skin="warm_yellow">暖</button>
+        </div>
+      </section>
+
+      <section class="top-actions">
+        <button class="btn" id="importBtn">导入配置</button>
+        <button class="btn" id="exportBtn">导出配置</button>
+        <button class="btn primary" id="saveBtn">保存配置</button>
+      </section>
+    </header>
+
+    <section class="workspace">
+      <aside class="panel left-panel">
+        <div>
+          <h2 class="panel-title">模板方向</h2>
+          <p class="panel-desc">可新增、编辑、复制、删除模板。保存后写入配置，右侧可给每个方案上传 OSS 预览图。</p>
+        </div>
+
+        <div class="designer-switch">
+          <button class="designer-btn active" data-designer="graphic_design">平面设计</button>
+          <button class="designer-btn" data-designer="interior_design">室内设计</button>
+        </div>
+
+        <div class="mode-list" id="modeList"></div>
+
+        <div class="config-card">
+          <strong>模板管理</strong>
+          <div class="mode-tools">
+            <button class="btn small" id="addModeBtn">新增</button>
+            <button class="btn small" id="editModeBtn">编辑</button>
+            <button class="btn small" id="copyModeBtn">复制</button>
+            <button class="btn small danger" id="deleteModeBtn">删除</button>
+          </div>
+          <strong>配置管理</strong>
+          <div class="config-line" id="statusBox">配置状态：正在读取...</div>
+          <button class="btn" id="resetModeBtn">恢复当前默认</button>
+          <button class="btn danger" id="clearLocalBtn">清空本地缓存</button>
+        </div>
+      </aside>
+
+      <section class="panel editor-panel" id="editorPanel">
+        <div class="prompt-tabs" id="promptTabs"></div>
+
+        <div class="prompt-editor-card">
+          <div class="prompt-card-head">
+            <strong id="fieldTitle">参考图说明</strong>
+            <span class="field-name" id="fieldName">image_roles</span>
+          </div>
+
+          <textarea id="promptText" spellcheck="false"></textarea>
+
+          <div class="editor-meta">
+            <span id="charCount">0 字符</span>
+            <span id="saveHint">已保存</span>
+          </div>
+        </div>
+
+        <div class="tips-card">
+          <div class="tips-main">
+            <div class="tips-label" id="currentTemplateLabel">当前模板：品牌主视觉 KV</div>
+            <div class="tips-preview" id="currentTemplateDesc">修改后可保存到当前模板配置。</div>
+          </div>
+          <button class="btn" id="copyCurrentBtn">复制字段</button>
+          <button class="btn" id="copyFullPromptBtn">复制整组</button>
+        </div>
+      </section>
+
+      <section class="panel preview-panel" id="previewPanel">
+        <div class="preview-switch">
+          <button class="active" data-preview-mode="template">当前预览</button>
+          <button data-preview-mode="runtime">最近生成</button>
+          <button data-preview-mode="failed">仅看报错</button>
+        </div>
+
+        <div class="preview-content">
+          <div class="template-viewer" id="templateViewer">
+            <div class="preview-stage" id="previewStage">
+              <div class="preview-badge" id="previewBadge">方案 A</div>
+              <button class="preview-upload-icon" id="uploadPreviewBtn" title="上传当前方案预览图">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 16V5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                  <path d="M7.5 9.5 12 5l4.5 4.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M5 16.5v1.7A2.8 2.8 0 0 0 7.8 21h8.4a2.8 2.8 0 0 0 2.8-2.8v-1.7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <img class="preview-main-img" id="previewMainImage" alt="模板预览图" />
+            </div>
+            <div class="thumb-row" id="thumbRow"></div>
+          </div>
+
+          <div class="runtime-grid" id="runtimeGrid" style="display:none"></div>
+        </div>
+
+        <div class="preview-footer">
+          <div class="preview-summary">
+            <span>设计方向：<b id="infoDesigner">平面设计</b></span>
+            <span>当前模板：<b id="infoMode">品牌主视觉 KV</b></span>
+            <span>主题：<b id="infoSkin">冬之韵淡灰</b></span>
+            <span>当前方案：<b id="infoVariant">方案 A</b></span>
+            <span>状态：<b id="runtimePollState">等待读取</b></span>
+          </div>
+
+          <div class="preview-actions">
+            <button class="btn primary" id="refreshRuntimeBtn">刷新结果</button>
+            <button class="btn warn" id="retryCurrentBtn">重抽当前</button>
+            <button class="btn" id="retryFailedBtn">重抽报错</button>
+            <button class="btn" id="retryAllBtn">重跑全部</button>
+            <button class="btn danger" id="clearRuntimeBtn">清空预览</button>
+            <label class="auto-retry">
+              <input type="checkbox" id="autoRetryToggle" checked />
+              报错自动重抽
+            </label>
+            <button class="btn ok" id="exportPromptTxtBtn">导出 TXT</button>
+            <button class="btn" id="copyCurrentJsonBtn">复制 JSON</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer">
+      <span id="footerText">Hrio Design Prompt Editor · Ready</span>
+      <span>UI Skin Only · Prompt Safe</span>
+    </footer>
+  </div>
+
+  <input class="file-input" type="file" id="importFile" accept=".json,application/json" />
+  <input class="file-input" type="file" id="previewUploadFile" accept="image/*" />
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-mask" id="resultModal">
+    <div class="modal">
+      <div class="modal-head">
+        <strong id="modalTitle">结果详情</strong>
+        <button class="btn small" id="modalCloseBtn">关闭</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-image" id="modalImage"></div>
+        <div class="modal-text" id="modalText"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn warn" id="modalRetryBtn">重抽当前图</button>
+        <button class="btn" id="modalCopyUrlBtn">复制图路径</button>
+        <button class="btn" id="modalCopyBtn">复制详情</button>
+        <button class="btn primary" id="modalCopyPromptBtn">复制当前模板提示词</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="modeModal">
+    <div class="modal">
+      <div class="modal-head">
+        <strong id="modeModalTitle">新增模板</strong>
+        <button class="btn small" id="modeModalCloseBtn">关闭</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row">
+          <label>模板名称</label>
+          <input id="modeTitleInput" placeholder="例如：平面｜品牌主视觉 KV" />
+        </div>
+        <div class="form-row">
+          <label>模板 Key</label>
+          <input id="modeKeyInput" placeholder="例如：brand_key_visual_custom" />
+        </div>
+        <div class="form-row">
+          <label>设计方向</label>
+          <select id="modeDesignerInput">
+            <option value="graphic_design">平面设计</option>
+            <option value="interior_design">室内设计</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>图标字</label>
+          <input id="modeIconInput" maxlength="4" placeholder="例如：品" />
+        </div>
+        <div class="form-row">
+          <label>模板描述</label>
+          <textarea id="modeDescInput" placeholder="用于左侧和当前模板说明"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" id="duplicateDefaultPromptBtn">套用当前提示词</button>
+        <button class="btn primary" id="modeSaveBtn">保存模板</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const DEFAULT_PLUGIN_VERSION = "8.1.0";
+      const STORAGE_KEY = "hrio.designPromptEditor.cache.v810";
+      const UI_STATE_KEY = "hrio.designPromptEditor.ui.v810";
+      const COMMAND_CHANNEL = "hrio_design_template_bridge";
+      const COMMAND_STORAGE_KEY = "hrio_design_template_command";
+      const LIVE_CONFIG_KEY = "hrio_design_template_live_config";
+      const ASSET_BASE = "https://img.hrio.site/assets/plu/";
+
+      const API_BASE_CANDIDATES = [
+        "",
+        "http://bj-aliyun-1.moki.wang:18000/api",
+        "https://zheshihouduan.tenx-jingli.cloud/api"
+      ];
+
+      const SIMPLE_UPLOAD_ROUTES = [
+        "/hrio-design/upload-preview",
+        "/uploads/image",
+        "/api/uploads/image"
+      ];
+
+      const PRESIGN_ROUTES = [
+        "/hrio-design/uploads/presign",
+        "/uploads/presign",
+        "/api/uploads/presign"
+      ];
+
+      const CONFIG_GET_ROUTES = [
+        "/hrio-design/config",
+        "./banana_designer_prompts.json",
+        "././banana_designer_prompts.json"
+      ];
+
+      const CONFIG_POST_ROUTES = [
+        "/hrio-design/config"
+      ];
+
+      const RUNTIME_GET_ROUTES = [
+        "/hrio-design/runtime"
+      ];
+
+      const RUNTIME_CLEAR_ROUTES = [
+        "/hrio-design/runtime/clear"
+      ];
+
+      const DESIGNER_TYPE_OPTIONS = {
+        "平面设计": "graphic_design",
+        "室内设计": "interior_design"
+      };
+
+      const OUTPUT_STRATEGY_OPTIONS = {
+        "单图生成": "single",
+        "三方案并发": "three_variants",
+        "主图 + 延展 + 细节": "main_extend_detail"
+      };
+
+      const CREATIVITY_OPTIONS = {
+        "保守": "safe",
+        "平衡": "balanced",
+        "大胆": "bold"
+      };
+
+      const THEME_SKINS = {
+        "冬之韵淡灰": {
+          key: "winter_gray",
+          background_url: "https://img.hrio.site/assets/plu/bg.png",
+          tone: "淡灰、冰蓝、冬之韵、建筑线稿、克制留白"
+        },
+        "暖砂淡黄": {
+          key: "warm_yellow",
+          background_url: "https://img.hrio.site/assets/plu/bg2.png",
+          tone: "淡黄、暖砂、石膏肌理、柔和室内、自然光感"
+        }
+      };
+
+      const MODE_DEFS = {
+        brand_key_visual: {
+          title: "平面｜品牌主视觉 KV",
+          designer_type: "graphic_design",
+          icon: "品",
+          desc: "品牌素材、Logo、产品主体、核心视觉元素。适合品牌发布与商业提案。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "极简高级版", file: "01_平面设计_品牌主视觉KV_01_极简高级版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "视觉冲击版", file: "01_平面设计_品牌主视觉KV_02_视觉冲击版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "实验设计版", file: "01_平面设计_品牌主视觉KV_03_实验设计版.png" }
+          ]
+        },
+        poster_design: {
+          title: "平面｜活动海报 / 宣传海报",
+          designer_type: "graphic_design",
+          icon: "海",
+          desc: "活动主题、宣传海报、营销视觉底图。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "商业稳定版", file: "02_平面设计_活动海报宣传海报_01_商业稳定版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "年轻传播版", file: "02_平面设计_活动海报宣传海报_02_年轻传播版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "艺术实验版", file: "02_平面设计_活动海报宣传海报_03_艺术实验版.png" }
+          ]
+        },
+        social_cover: {
+          title: "平面｜社媒封面 / 小红书封面",
+          designer_type: "graphic_design",
+          icon: "媒",
+          desc: "社媒封面、小红书封面、短视频封面。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "高级干净版", file: "03_平面设计_社媒封面小红书封面_01_高级干净版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "强吸引版", file: "03_平面设计_社媒封面小红书封面_02_强吸引版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "氛围故事版", file: "03_平面设计_社媒封面小红书封面_03_氛围故事版.png" }
+          ]
+        },
+        web_hero_banner: {
+          title: "平面｜网页首屏 / Banner",
+          designer_type: "graphic_design",
+          icon: "网",
+          desc: "网页首屏、Banner、产品官网背景。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "官网高级版", file: "04_平面设计_网页首屏Banner_01_官网高级版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "科技视觉版", file: "04_平面设计_网页首屏Banner_02_科技视觉版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "品牌氛围版", file: "04_平面设计_网页首屏Banner_03_品牌氛围版.png" }
+          ]
+        },
+        proposal_cover: {
+          title: "平面｜PPT / 提案封面",
+          designer_type: "graphic_design",
+          icon: "提",
+          desc: "PPT 封面、商业提案、咨询公司汇报封面。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "商务咨询版", file: "05_平面设计_PPT提案封面_01_商务咨询版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "设计事务所版", file: "05_平面设计_PPT提案封面_02_设计事务所版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "创意提案版", file: "05_平面设计_PPT提案封面_03_创意提案版.png" }
+          ]
+        },
+        brand_extension: {
+          title: "平面｜品牌视觉延展",
+          designer_type: "graphic_design",
+          icon: "延",
+          desc: "品牌主视觉延展、物料延展、同系统视觉资产。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "主视觉延展", file: "06_平面设计_品牌视觉延展_01_主视觉延展.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "应用场景延展", file: "06_平面设计_品牌视觉延展_02_应用场景延展.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "抽象系统延展", file: "06_平面设计_品牌视觉延展_03_抽象系统延展.png" }
+          ]
+        },
+        space_style_concept: {
+          title: "室内｜空间风格概念图",
+          designer_type: "interior_design",
+          icon: "室",
+          desc: "空间风格、设计概念、室内提案方向。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "克制高级版", file: "07_室内设计_空间风格概念图_01_克制高级版.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "温暖生活版", file: "07_室内设计_空间风格概念图_02_温暖生活版.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "设计张力版", file: "07_室内设计_空间风格概念图_03_设计张力版.png" }
+          ]
+        },
+        interior_mood_render: {
+          title: "室内｜室内氛围渲染",
+          designer_type: "interior_design",
+          icon: "氛",
+          desc: "室内氛围、自然光、样板间、居住情绪。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "白天自然光", file: "08_室内设计_室内氛围渲染_01_白天自然光.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "傍晚暖光", file: "08_室内设计_室内氛围渲染_02_傍晚暖光.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "高级静谧", file: "08_室内设计_室内氛围渲染_03_高级静谧.png" }
+          ]
+        },
+        material_moodboard: {
+          title: "室内｜材质情绪板",
+          designer_type: "interior_design",
+          icon: "材",
+          desc: "石材、木材、织物、金属、软装材质系统。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "主材质板", file: "09_室内设计_材质情绪板_01_主材质板.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "软装搭配板", file: "09_室内设计_材质情绪板_02_软装搭配板.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "局部细节板", file: "09_室内设计_材质情绪板_03_局部细节板.png" }
+          ]
+        },
+        soft_furnishing_plan: {
+          title: "室内｜软装搭配方案",
+          designer_type: "interior_design",
+          icon: "软",
+          desc: "家具、布艺、灯具、地毯、装饰画、摆件搭配。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "克制高级", file: "10_室内设计_软装搭配方案_01_克制高级.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "温暖生活", file: "10_室内设计_软装搭配方案_02_温暖生活.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "设计感强化", file: "10_室内设计_软装搭配方案_03_设计感强化.png" }
+          ]
+        },
+        material_replacement: {
+          title: "室内｜墙面 / 地面材质替换",
+          designer_type: "interior_design",
+          icon: "替",
+          desc: "墙面、地面、石材、木饰面、微水泥材质替换。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "墙面材质替换", file: "11_室内设计_墙面地面材质替换_01_墙面材质替换.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "地面材质替换", file: "11_室内设计_墙面地面材质替换_02_地面材质替换.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "墙地整体协调", file: "11_室内设计_墙面地面材质替换_03_墙地整体协调.png" }
+          ]
+        },
+        lighting_mood: {
+          title: "室内｜灯光氛围调整",
+          designer_type: "interior_design",
+          icon: "光",
+          desc: "自然光、间接光、重点照明、夜间高级氛围。",
+          variants: [
+            { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "白天自然光", file: "12_室内设计_灯光氛围调整_01_白天自然光.png" },
+            { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "傍晚暖光", file: "12_室内设计_灯光氛围调整_02_傍晚暖光.png" },
+            { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "夜间高级氛围", file: "12_室内设计_灯光氛围调整_03_夜间高级氛围.png" }
+          ]
+        }
+      };
+
+      const PROMPT_FIELDS = [
+        ["image_roles", "参考图说明"],
+        ["global_prompt", "全局任务"],
+        ["variant_a_prompt", "方案 A"],
+        ["variant_b_prompt", "方案 B"],
+        ["variant_c_prompt", "方案 C"],
+        ["consistency_prompt", "一致性"],
+        ["negative_prompt", "反向约束"]
+      ];
+
+      const DEFAULT_MODE_OPTIONS = Object.fromEntries(
+        Object.entries(MODE_DEFS).map(([key, def]) => [def.title, key])
+      );
+
+      const DEFAULT_PROMPTS = Object.fromEntries(
+        Object.entries(MODE_DEFS).map(([key, def]) => [key, createDefaultPrompt(def)])
+      );
+
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+      const appState = {
+        pluginVersion: DEFAULT_PLUGIN_VERSION,
+        designer: "graphic_design",
+        skinKey: "winter_gray",
+        previewMode: "template",
+        selectedVariantKey: "variant_a",
+        dirty: false,
+        runtime: {},
+        autoRetry: true,
+        lastModalText: "",
+        lastModalImageUrl: "",
+        lastModalRetryPayload: null,
+        modeModalType: "add",
+        saveTimer: null,
+        retryStamp: {}
+      };
+
+      let modeOptions = { ...DEFAULT_MODE_OPTIONS };
+      let modeMeta = deepClone(MODE_DEFS);
+      let configByMode = deepClone(DEFAULT_PROMPTS);
+      let currentModeKey = "brand_key_visual";
+      let currentField = "image_roles";
+
+      function deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj || {}));
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function createDefaultPrompt(def) {
+        return {
+          designer_type: def.designer_type || "graphic_design",
+          preview_urls: {},
+          image_roles: "Image 1 = 主体素材；Image 2 = 风格参考；Image 3 = 配色参考；Image 4 = 版式参考；Image 5 = 材质或纹理参考；Image 6 = 背景或场景参考。",
+          global_prompt: `任务：${cleanTitle(def.title)}。请基于上传参考图生成高审美设计图，保持构图高级、层级清晰、材质自然、画面干净。不要直接生成文字，不要乱码，不要水印。`,
+          variant_a_prompt: `${def.variants?.[0]?.label || "方案 A"}：${def.variants?.[0]?.name || "稳定高级版"}。构图稳定、清晰、适合正式商业使用。`,
+          variant_b_prompt: `${def.variants?.[1]?.label || "方案 B"}：${def.variants?.[1]?.name || "视觉强化版"}。增强视觉吸引力、层次、空间与光影。`,
+          variant_c_prompt: `${def.variants?.[2]?.label || "方案 C"}：${def.variants?.[2]?.name || "实验设计版"}。更有设计张力，但仍保持高级可落地。`,
+          consistency_prompt: "三张图必须保持同一设计系统、同一视觉气质、同一素材逻辑，只允许方案表达差异。",
+          negative_prompt: "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格，不要促销标签，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要杂乱拼贴，不要廉价滤镜。"
+        };
+      }
+
+      function cleanTitle(title) {
+        return String(title || "").replace(/^平面｜|^室内｜/, "").trim();
+      }
+
+      function toast(message) {
+        const el = $("#toast");
+        el.textContent = message;
+        el.classList.add("show");
+        clearTimeout(window.__designerToastTimer);
+        window.__designerToastTimer = setTimeout(() => el.classList.remove("show"), 2400);
+      }
+
+      function setStatus(message) {
+        $("#statusBox").textContent = message;
+      }
+
+      function setDirty(value) {
+        appState.dirty = value;
+        $("#saveBtn").classList.toggle("dirty", value);
+        $("#saveBtn").textContent = value ? "保存配置 *" : "保存配置";
+        $("#saveHint").textContent = value ? "未保存" : "已保存";
+      }
+
+      function saveUiState() {
+        localStorage.setItem(UI_STATE_KEY, JSON.stringify({
+          designer: appState.designer,
+          skinKey: appState.skinKey,
+          previewMode: appState.previewMode,
+          selectedVariantKey: appState.selectedVariantKey,
+          currentModeKey,
+          currentField,
+          autoRetry: appState.autoRetry
+        }));
+      }
+
+      function loadUiState() {
+        try {
+          const raw = localStorage.getItem(UI_STATE_KEY);
+          if (!raw) return;
+          const data = JSON.parse(raw);
+          if (data.designer) appState.designer = data.designer;
+          if (data.skinKey) appState.skinKey = data.skinKey;
+          if (data.previewMode) appState.previewMode = data.previewMode;
+          if (data.selectedVariantKey) appState.selectedVariantKey = data.selectedVariantKey;
+          if (data.currentModeKey) currentModeKey = data.currentModeKey;
+          if (data.currentField) currentField = data.currentField;
+          if (typeof data.autoRetry === "boolean") appState.autoRetry = data.autoRetry;
+        } catch {}
+      }
+
+      function normalizeSkinKey(value) {
+        const raw = String(value || "");
+        if (raw === "warm_yellow" || raw === "暖砂淡黄") return "warm_yellow";
+        return "winter_gray";
+      }
+
+      function renderSkin() {
+        document.body.dataset.skin = normalizeSkinKey(appState.skinKey);
+        $$(".skin-toggle button").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.skin === appState.skinKey);
+        });
+        $("#infoSkin").textContent = appState.skinKey === "warm_yellow" ? "暖砂淡黄" : "冬之韵淡灰";
+      }
+
+      function titleByModeKey(key) {
+        const found = Object.entries(modeOptions).find(([, v]) => v === key);
+        return found?.[0] || modeMeta[key]?.title || key;
+      }
+
+      function modeDef(key) {
+        const def = modeMeta[key] || MODE_DEFS[key] || {};
+        return {
+          title: titleByModeKey(key),
+          designer_type: def.designer_type || configByMode[key]?.designer_type || "graphic_design",
+          icon: def.icon || (titleByModeKey(key).replace(/^平面｜|^室内｜/, "").slice(0, 1) || "设"),
+          desc: def.desc || "自定义设计模板。",
+          variants: def.variants || createFallbackVariants(key)
+        };
+      }
+
+      function createFallbackVariants(key) {
+        return [
+          { key: "variant_a", field: "variant_a_prompt", label: "方案 A", name: "稳定高级版", file: `${key}_variant_a.png` },
+          { key: "variant_b", field: "variant_b_prompt", label: "方案 B", name: "视觉强化版", file: `${key}_variant_b.png` },
+          { key: "variant_c", field: "variant_c_prompt", label: "方案 C", name: "实验设计版", file: `${key}_variant_c.png` }
+        ];
+      }
+
+      function ensureModeExists(key, title = "") {
+        if (!key) return;
+        if (!Object.values(modeOptions).includes(key)) {
+          modeOptions[title || modeMeta[key]?.title || key] = key;
+        }
+        if (!modeMeta[key]) {
+          modeMeta[key] = {
+            title: title || key,
+            designer_type: appState.designer,
+            icon: (title || key).slice(0, 1),
+            desc: "自定义设计模板。",
+            variants: createFallbackVariants(key)
+          };
+        }
+        if (!configByMode[key]) {
+          configByMode[key] = createDefaultPrompt(modeDef(key));
+        }
+        if (!configByMode[key].preview_urls || typeof configByMode[key].preview_urls !== "object") {
+          configByMode[key].preview_urls = {};
+        }
+        configByMode[key].designer_type = configByMode[key].designer_type || modeDef(key).designer_type;
+      }
+
+      function restoreBuiltInModes() {
+        Object.entries(DEFAULT_MODE_OPTIONS).forEach(([display, key]) => {
+          if (!Object.values(modeOptions).includes(key)) {
+            modeOptions[display] = key;
+          }
+        });
+
+        Object.entries(MODE_DEFS).forEach(([key, def]) => {
+          modeMeta[key] = {
+            ...def,
+            ...(modeMeta[key] || {}),
+            title: (modeMeta[key] && modeMeta[key].title) || def.title,
+            designer_type: def.designer_type,
+            icon: (modeMeta[key] && modeMeta[key].icon) || def.icon,
+            desc: (modeMeta[key] && modeMeta[key].desc) || def.desc,
+            variants: (modeMeta[key] && modeMeta[key].variants) || def.variants
+          };
+
+          if (!configByMode[key]) {
+            configByMode[key] = createDefaultPrompt(modeMeta[key]);
+          }
+
+          configByMode[key].designer_type = def.designer_type;
+          if (!configByMode[key].preview_urls || typeof configByMode[key].preview_urls !== "object") {
+            configByMode[key].preview_urls = {};
+          }
+        });
+      }
+
+      function getCurrentModeData() {
+        ensureModeExists(currentModeKey);
+        return configByMode[currentModeKey];
+      }
+
+      function getVariants(key = currentModeKey) {
+        return modeDef(key).variants || createFallbackVariants(key);
+      }
+
+      function getCurrentVariant() {
+        const variants = getVariants();
+        return variants.find((item) => item.key === appState.selectedVariantKey) || variants[0];
+      }
+
+      function snapshotCurrentText() {
+        const textarea = $("#promptText");
+        if (!textarea) return;
+        ensureModeExists(currentModeKey);
+        configByMode[currentModeKey][currentField] = textarea.value;
+      }
+
+      function cacheConfig() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(buildExportConfig({ skipSnapshot: true })));
+        } catch {}
+      }
+
+      async function fetchJsonFirst(routes, options = {}) {
+        let lastError = null;
+        for (const route of routes) {
+          try {
+            const resp = await fetch(route, {
+              cache: "no-store",
+              headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
+              ...options
+            });
+            if (!resp.ok) throw new Error(`${route} HTTP ${resp.status}`);
+            const json = await resp.json().catch(() => ({}));
+            return { route, json };
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error("所有接口不可用");
+      }
+
+      async function loadConfig() {
+        loadUiState();
+        renderSkin();
+        setStatus("配置状态：正在读取远端配置...");
+
+        try {
+          const { route, json } = await fetchJsonFirst(CONFIG_GET_ROUTES);
+          normalizeLoadedConfig(json);
+          setStatus(`配置状态：已读取 ${route}`);
+        } catch {
+          const cached = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LIVE_CONFIG_KEY);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              normalizeLoadedConfig(parsed.config || parsed.prompt_config || parsed);
+              setStatus("配置状态：远端不可用，已读取本地缓存");
+            } catch {
+              normalizeLoadedConfig({});
+              setStatus("配置状态：使用页面默认配置");
+            }
+          } else {
+            normalizeLoadedConfig({});
+            setStatus("配置状态：使用页面默认配置");
+          }
+        }
+
+        restoreBuiltInModes();
+        ensureCurrentModeValid();
+        renderAll();
+        setDirty(false);
+        publishSync("load_config", false);
+      }
+
+      function normalizeLoadedConfig(payload) {
+        const config = payload.prompt_config || payload.config || payload.designer_template?.prompt_config || payload;
+        if (!config || typeof config !== "object") return;
+
+        appState.pluginVersion = config.plugin_version || payload.plugin_version || DEFAULT_PLUGIN_VERSION;
+
+        if (config.theme_skins && typeof config.theme_skins === "object") {
+          Object.assign(THEME_SKINS, config.theme_skins);
+        }
+
+        if (config.mode_options && typeof config.mode_options === "object") {
+          // 重要：不要用远端/本地配置完全覆盖内置模板。
+          // 用户旧配置里可能只有平面设计或只有一个模板；这里必须合并，避免“室内设计”全部消失。
+          const mergedOptions = { ...DEFAULT_MODE_OPTIONS };
+          Object.entries(config.mode_options).forEach(([display, key]) => {
+            const k = String(key || "").trim();
+            const d = String(display || k).trim();
+            if (!k || !d) return;
+            mergedOptions[d] = k;
+            if (!modeMeta[k]) {
+              modeMeta[k] = {
+                title: d,
+                designer_type: d.startsWith("室内") ? "interior_design" : "graphic_design",
+                icon: cleanTitle(d).slice(0, 1) || "设",
+                desc: "自定义设计模板。",
+                variants: createFallbackVariants(k)
+              };
+            } else {
+              modeMeta[k].title = d;
+            }
+          });
+          modeOptions = mergedOptions;
+        }
+
+        if (config.mode_meta && typeof config.mode_meta === "object") {
+          Object.entries(config.mode_meta).forEach(([key, meta]) => {
+            modeMeta[key] = { ...(modeMeta[key] || {}), ...(meta || {}) };
+          });
+        }
+
+        const topPreview = config.preview_urls && typeof config.preview_urls === "object" ? config.preview_urls : {};
+        const modes = config.modes && typeof config.modes === "object" ? config.modes : {};
+
+        Object.entries(modes).forEach(([key, data]) => {
+          ensureModeExists(key, titleByModeKey(key));
+          configByMode[key] = {
+            ...createDefaultPrompt(modeDef(key)),
+            ...(data || {}),
+            preview_urls: {
+              ...(topPreview[key] || {}),
+              ...((data || {}).preview_urls || {})
+            }
+          };
+        });
+
+        Object.values(modeOptions).forEach((key) => ensureModeExists(key, titleByModeKey(key)));
+        restoreBuiltInModes();
+      }
+
+      function ensureCurrentModeValid() {
+        const keys = Object.values(modeOptions).filter((key) => modeDef(key).designer_type === appState.designer);
+        if (!keys.includes(currentModeKey)) {
+          currentModeKey = keys[0] || Object.values(modeOptions)[0] || "brand_key_visual";
+        }
+        ensureModeExists(currentModeKey);
+        const variants = getVariants();
+        if (!variants.some((item) => item.key === appState.selectedVariantKey)) {
+          appState.selectedVariantKey = variants[0]?.key || "variant_a";
+        }
+        if (!PROMPT_FIELDS.some(([key]) => key === currentField)) {
+          currentField = "image_roles";
+        }
+      }
+
+      function renderDesignerSwitch() {
+        $$(".designer-btn").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.designer === appState.designer);
+        });
+        $("#infoDesigner").textContent = appState.designer === "interior_design" ? "室内设计" : "平面设计";
+      }
+
+      function renderModes() {
+        const list = $("#modeList");
+        list.innerHTML = "";
+
+        let entries = Object.entries(modeOptions)
+          .filter(([, key]) => modeDef(key).designer_type === appState.designer);
+
+        if (!entries.length) {
+          restoreBuiltInModes();
+          entries = Object.entries(modeOptions)
+            .filter(([, key]) => modeDef(key).designer_type === appState.designer);
+        }
+
+        entries.forEach(([title, key]) => {
+          ensureModeExists(key, title);
+          const def = modeDef(key);
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `mode-card ${key === currentModeKey ? "active" : ""}`;
+          btn.innerHTML = `
+            <div class="mode-sign">${escapeHtml(def.icon)}</div>
+            <div class="mode-text">
+              <strong>${escapeHtml(cleanTitle(title))}</strong>
+              <span>${escapeHtml(def.desc)}</span>
+            </div>
+          `;
+          btn.onclick = () => {
+            if (key === currentModeKey) return;
+            snapshotCurrentText();
+            currentModeKey = key;
+            currentField = "image_roles";
+            appState.selectedVariantKey = getVariants(key)[0]?.key || "variant_a";
+            setDirty(true);
+            saveUiState();
+            renderAll();
+            publishSync("switch_mode", true);
+          };
+          list.appendChild(btn);
+        });
+      }
+
+      function renderPromptTabs() {
+        const box = $("#promptTabs");
+        box.innerHTML = "";
+        PROMPT_FIELDS.forEach(([key, label]) => {
+          const btn = document.createElement("button");
+          btn.className = `prompt-tab ${key === currentField ? "active" : ""}`;
+          btn.textContent = label;
+          btn.onclick = () => {
+            snapshotCurrentText();
+            currentField = key;
+            saveUiState();
+            renderPromptEditor();
+            publishSync("switch_field", false);
+          };
+          box.appendChild(btn);
+        });
+      }
+
+      function renderPromptEditor() {
+        const data = getCurrentModeData();
+        const fieldDef = PROMPT_FIELDS.find(([key]) => key === currentField) || PROMPT_FIELDS[0];
+        $("#fieldTitle").textContent = fieldDef[1];
+        $("#fieldName").textContent = fieldDef[0];
+        $("#promptText").value = data[fieldDef[0]] || "";
+        $("#charCount").textContent = `${$("#promptText").value.length} 字符`;
+        $("#currentTemplateLabel").textContent = `当前模板：${cleanTitle(titleByModeKey(currentModeKey))}`;
+        $("#currentTemplateDesc").textContent = modeDef(currentModeKey).desc;
+        $$(".prompt-tab").forEach((btn) => btn.classList.toggle("active", btn.textContent === fieldDef[1]));
+      }
+
+      function assetUrl(file) {
+        if (!file) return "";
+        if (/^https?:\/\//i.test(file) || /^data:/i.test(file)) return file;
+        return ASSET_BASE + encodeURIComponent(file);
+      }
+
+      function getUploadedPreviewUrl(variantKey) {
+        const urls = getCurrentModeData().preview_urls || {};
+        return urls[variantKey] || "";
+      }
+
+      function getLatestRuntimeGroup() {
+        const latest = appState.runtime.latest || appState.runtime;
+        const groups =
+          latest.groups ||
+          latest.results_groups ||
+          appState.runtime.groups ||
+          appState.runtime.results ||
+          [];
+        if (Array.isArray(groups) && groups.length) {
+          return groups.find((group) => groupMatchesMode(group)) || groups[0];
+        }
+        if (latest.views || latest.results) return latest;
+        return null;
+      }
+
+      function groupMatchesMode(group) {
+        const mode = String(group?.mode_actual || group?.mode_key || group?.template_key || group?.template_display || group?.mode_display || "");
+        return !mode || mode === currentModeKey || mode === titleByModeKey(currentModeKey) || mode === cleanTitle(titleByModeKey(currentModeKey));
+      }
+
+      function getRuntimeItem(variantKey) {
+        const group = getLatestRuntimeGroup();
+        if (!group || !groupMatchesMode(group)) return null;
+        const views = group.views || group.results || group.outputs || {};
+        return views[variantKey] || views[variantKey.replace("variant_", "方案")] || null;
+      }
+
+      function pickImage(item) {
+        if (!item) return "";
+        if (typeof item === "string") return item;
+        return item.image || item.url || item.image_url || item.imageUrl || item.oss_url || item.ossUrl || item.public_url || item.publicUrl || item.preview_url || item.previewUrl || "";
+      }
+
+      function normalizeRuntimeItem(item) {
+        if (!item) return { status: "missing", error: "", image: "" };
+        if (typeof item === "string") return { status: "success", image: item, error: "" };
+        const image = pickImage(item);
+        const error = item.error || item.message || item.reason || "";
+        return {
+          ...item,
+          image,
+          error,
+          status: item.status || item.state || (error ? "failed" : image ? "success" : "missing")
+        };
+      }
+
+      function previewSourceForVariant(variant) {
+        const live = normalizeRuntimeItem(getRuntimeItem(variant.key));
+        const liveImage = pickImage(live);
+        if (liveImage) {
+          return { url: liveImage, source: "实时结果", item: live, runtime: true };
+        }
+
+        const uploaded = getUploadedPreviewUrl(variant.key);
+        if (uploaded) {
+          return { url: uploaded, source: "OSS预览", item: { status: "success", image: uploaded, from_oss_preview: true }, runtime: false };
+        }
+
+        return {
+          url: assetUrl(variant.file),
+          source: "模板预览",
+          item: { status: "success", image: assetUrl(variant.file), from_template: true },
+          runtime: false
+        };
+      }
+
+      function renderTemplatePreview() {
+        const variants = getVariants();
+        const selected = getCurrentVariant();
+        const selectedSource = previewSourceForVariant(selected);
+
+        $("#previewBadge").textContent = `${selected.label} · ${selected.name}`;
+        $("#previewMainImage").src = selectedSource.url;
+        $("#infoVariant").textContent = `${selected.label} · ${selected.name}`;
+        $("#infoMode").textContent = cleanTitle(titleByModeKey(currentModeKey));
+
+        $("#thumbRow").innerHTML = variants.map((item) => {
+          const src = previewSourceForVariant(item);
+          return `
+            <button class="thumb-card ${item.key === appState.selectedVariantKey ? "active" : ""}" data-variant="${escapeHtml(item.key)}">
+              <img src="${escapeHtml(src.url)}" alt="${escapeHtml(item.label)} ${escapeHtml(item.name)}" loading="lazy" />
+              <span>${escapeHtml(item.label)} · ${escapeHtml(item.name)}</span>
+            </button>
+          `;
+        }).join("");
+
+        $$("#thumbRow .thumb-card").forEach((btn) => {
+          btn.onclick = () => {
+            appState.selectedVariantKey = btn.dataset.variant;
+            saveUiState();
+            renderTemplatePreview();
+            publishSync("switch_variant", false);
+          };
+        });
+      }
+
+      function renderRuntime() {
+        const box = $("#runtimeGrid");
+        const latest = appState.runtime.latest || appState.runtime;
+        const groupsRaw = latest.groups || latest.results_groups || appState.runtime.groups || [];
+        let groups = Array.isArray(groupsRaw) && groupsRaw.length ? groupsRaw : (latest.views || latest.results ? [latest] : []);
+        groups = groups.filter((group) => groupMatchesMode(group));
+
+        if (appState.previewMode === "failed") {
+          groups = groups.filter((group) => getVariants().some((variant) => {
+            const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
+            const s = String(item.status || "").toLowerCase();
+            return item.error || ["failed", "fail", "error", "missing"].includes(s);
+          }));
+        }
+
+        if (!groups.length) {
+          box.innerHTML = `<div class="placeholder">${appState.previewMode === "failed" ? "暂无报错结果" : "暂无最近生成结果"}<br>点击刷新结果读取节点运行结果。</div>`;
+          return;
+        }
+
+        box.innerHTML = groups.map((group, groupIndex) => {
+          const title = group.template_display || group.mode_display || titleByModeKey(currentModeKey);
+          const sub = [
+            group.output_strategy || "",
+            group.model || "",
+            group.updated_at ? new Date((Number(group.updated_at) > 10000000000 ? Number(group.updated_at) : Number(group.updated_at) * 1000)).toLocaleString() : ""
+          ].filter(Boolean).join(" · ");
+
+          const views = getVariants().map((variant) => {
+            const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
+            const image = pickImage(item);
+            const status = String(item.status || "missing").toLowerCase();
+            const failed = item.error || ["failed", "fail", "error"].includes(status);
+            return `
+              <div class="runtime-view ${failed ? "failed" : "success"}" data-group="${groupIndex}" data-variant="${escapeHtml(variant.key)}">
+                ${
+                  image
+                    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(variant.label)}" loading="lazy" />`
+                    : `<div class="placeholder" style="min-height:150px;border:0;border-radius:18px;">${failed ? "生成失败" : "暂无图片"}</div>`
+                }
+                <span>${escapeHtml(variant.label)} · ${failed ? "可重抽" : "生成结果"}</span>
+              </div>
+            `;
+          }).join("");
+
+          return `
+            <section class="runtime-group">
+              <div class="runtime-group-head">
+                <div>
+                  <strong>${escapeHtml(cleanTitle(title))}</strong><br>
+                  <span>${escapeHtml(sub || "最近生成")}</span>
+                </div>
+                <button class="btn small" data-retry-group="${groupIndex}">重跑本组</button>
+              </div>
+              <div class="runtime-body">${views}</div>
+            </section>
+          `;
+        }).join("");
+
+        $$(".runtime-view").forEach((card) => {
+          card.onclick = () => {
+            const group = groups[Number(card.dataset.group || 0)];
+            const variant = getVariants().find((item) => item.key === card.dataset.variant) || getCurrentVariant();
+            const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
+            openImageModal(`${variant.label} · ${variant.name}`, pickImage(item), runtimeDetailText(group, variant, item), {
+              action: "retry_one",
+              variant_key: variant.key,
+              group
+            });
+          };
+        });
+
+        $$("[data-retry-group]").forEach((btn) => {
+          btn.onclick = () => {
+            const group = groups[Number(btn.dataset.retryGroup || 0)];
+            sendRetryCommand("retry_all", null, group);
+          };
+        });
+      }
+
+      function renderPreview() {
+        const isTemplate = appState.previewMode === "template";
+        $("#templateViewer").style.display = isTemplate ? "grid" : "none";
+        $("#runtimeGrid").style.display = isTemplate ? "none" : "grid";
+
+        $$(".preview-switch button").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.previewMode === appState.previewMode);
+        });
+
+        if (isTemplate) renderTemplatePreview();
+        else renderRuntime();
+      }
+
+      function renderAll() {
+        ensureCurrentModeValid();
+        renderSkin();
+        renderDesignerSwitch();
+        renderModes();
+        renderPromptTabs();
+        renderPromptEditor();
+        renderPreview();
+        $("#autoRetryToggle").checked = Boolean(appState.autoRetry);
+        $("#footerText").textContent = `Hrio Design Prompt Editor · v${appState.pluginVersion || DEFAULT_PLUGIN_VERSION}`;
+        setDirty(appState.dirty);
+      }
+
+      async function refreshRuntime(showTip = false) {
+        $("#runtimePollState").textContent = "读取中...";
+        for (const route of RUNTIME_GET_ROUTES) {
+          try {
+            const resp = await fetch(route, { cache: "no-store" });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            appState.runtime = await resp.json();
+            $("#runtimePollState").textContent = "已读取";
+            renderPreview();
+            maybeAutoRetryFailed();
+            if (showTip) toast("已刷新，返回图会同步到当前预览");
+            return true;
+          } catch (error) {
+            console.warn("runtime failed:", route, error);
+          }
+        }
+        $("#runtimePollState").textContent = "读取失败";
+        if (showTip) toast("运行结果接口暂不可用");
+        return false;
+      }
+
+      async function clearRuntime() {
+        for (const route of RUNTIME_CLEAR_ROUTES) {
+          try {
+            const resp = await fetch(route, { method: "POST" });
+            if (resp.ok) break;
+          } catch {}
+        }
+        appState.runtime = {};
+        $("#runtimePollState").textContent = "已清空";
+        renderPreview();
+        toast("已清空前端预览缓存");
+      }
+
+      function statusText(status) {
+        const s = String(status || "").toLowerCase();
+        if (["success", "ok", "done"].includes(s)) return "成功";
+        if (["failed", "fail", "error"].includes(s)) return "报错";
+        if (["pending", "running"].includes(s)) return "生成中";
+        if (["missing", "unknown"].includes(s)) return "暂无";
+        return status || "未知";
+      }
+
+      function runtimeDetailText(group, variant, item) {
+        return [
+          `模板：${titleByModeKey(currentModeKey)}`,
+          `方案：${variant.label} · ${variant.name}`,
+          `状态：${statusText(item.status)}`,
+          `模型：${group.model || "-"}`,
+          `尺寸：${group.image_size || "-"}`,
+          `比例：${group.aspect_ratio || "-"}`,
+          `cache_key：${group.cache_key || "-"}`,
+          "",
+          item.error ? `报错：${item.error}` : "",
+          pickImage(item) || ""
+        ].filter(Boolean).join("\n");
+      }
+
+      function openImageModal(title, url, text, retryPayload = null) {
+        $("#modalTitle").textContent = title || "结果详情";
+        $("#modalImage").innerHTML = url
+          ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(title || "预览图")}" />`
+          : `<div class="placeholder" style="border:0;">暂无图片</div>`;
+        $("#modalText").textContent = text || "";
+        appState.lastModalText = text || "";
+        appState.lastModalImageUrl = url || "";
+        appState.lastModalRetryPayload = retryPayload || currentVariantPayload("retry_one");
+        $("#resultModal").classList.add("show");
+      }
+
+      function closeModal() {
+        $("#resultModal").classList.remove("show");
+      }
+
+      function currentVariantPayload(action = "retry_one") {
+        const variant = getCurrentVariant();
+        return {
+          action,
+          variant_key: variant.key,
+          variant_label: variant.label,
+          variant_name: variant.name,
+          template_mode: titleByModeKey(currentModeKey),
+          mode_key: currentModeKey,
+          mode_title: titleByModeKey(currentModeKey),
+          designer_key: appState.designer,
+          designer_display: appState.designer === "interior_design" ? "室内设计" : "平面设计",
+          generate_scope: variant.key === "variant_a" ? "仅重新生成方案A" : variant.key === "variant_b" ? "仅重新生成方案B" : "仅重新生成方案C"
+        };
+      }
+
+      function sendCommand(command) {
+        const payload = {
+          source: "banana_designer_prompt_editor",
+          channel: COMMAND_CHANNEL,
+          created_at: Date.now(),
+          ...command
+        };
+
+        try {
+          const bc = new BroadcastChannel(COMMAND_CHANNEL);
+          bc.postMessage(payload);
+          setTimeout(() => bc.close(), 500);
+        } catch {}
+
+        try {
+          localStorage.setItem(COMMAND_STORAGE_KEY, JSON.stringify(payload));
+        } catch {}
+
+        try {
+          if (window.opener && !window.opener.closed) window.opener.postMessage(payload, "*");
+        } catch {}
+
+        try {
+          window.parent?.postMessage(payload, "*");
+        } catch {}
+      }
+
+      function publishSync(reason = "edit", debouncedSave = false) {
+        snapshotCurrentText();
+        const payload = buildExportConfig({ skipSnapshot: true });
+        const command = {
+          type: "config_sync",
+          action: "config_sync",
+          reason,
+          current_mode_key: currentModeKey,
+          current_mode_title: titleByModeKey(currentModeKey),
+          current_field: currentField,
+          selected_variant_key: appState.selectedVariantKey,
+          designer_key: appState.designer,
+          designer_display: appState.designer === "interior_design" ? "室内设计" : "平面设计",
+          mode_options: payload.mode_options,
+          mode_meta: payload.mode_meta,
+          preview_urls: payload.preview_urls,
+          prompt_config: payload,
+          config: payload,
+          current_mode_config: getCurrentModeData()
+        };
+
+        localStorage.setItem(LIVE_CONFIG_KEY, JSON.stringify(command));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        sendCommand(command);
+
+        if (debouncedSave) {
+          clearTimeout(appState.saveTimer);
+          appState.saveTimer = setTimeout(() => {
+            postConfig(payload, false);
+          }, 900);
+        }
+      }
+
+      function sendRetryCommand(action = "retry_one", variantKey = null, group = null) {
+        const payload = variantKey
+          ? { ...currentVariantPayload(action), variant_key: variantKey }
+          : currentVariantPayload(action);
+
+        if (action === "retry_all") {
+          payload.generate_scope = "全部并发生成";
+        }
+
+        if (action === "retry_failed") {
+          payload.generate_scope = "全部并发生成";
+        }
+
+        if (group) payload.group = group;
+
+        sendCommand({
+          type: "retry",
+          ...payload,
+          prompt_config: buildExportConfig({ skipSnapshot: false }),
+          current_mode_config: getCurrentModeData(),
+          full_prompt: composeFullPrompt()
+        });
+
+        toast(action === "retry_all" ? "已发送重跑全部命令" : "已发送重抽命令");
+      }
+
+      function maybeAutoRetryFailed() {
+        if (!appState.autoRetry) return;
+
+        const latest = getLatestRuntimeGroup();
+        if (!latest) return;
+
+        const failed = getVariants().filter((variant) => {
+          const item = normalizeRuntimeItem((latest.views || latest.results || {})[variant.key]);
+          const s = String(item.status || "").toLowerCase();
+          return item.error || ["failed", "fail", "error"].includes(s);
+        });
+
+        if (!failed.length) return;
+
+        const key = `${currentModeKey}:${failed.map((x) => x.key).join(",")}`;
+        const now = Date.now();
+        if (now - (appState.retryStamp[key] || 0) < 9000) return;
+        appState.retryStamp[key] = now;
+
+        sendCommand({
+          type: "retry",
+          action: "retry_failed",
+          mode_key: currentModeKey,
+          mode_title: titleByModeKey(currentModeKey),
+          template_mode: titleByModeKey(currentModeKey),
+          designer_key: appState.designer,
+          failed_variants: failed.map((item) => item.key),
+          generate_scope: "全部并发生成",
+          prompt_config: buildExportConfig({ skipSnapshot: false })
+        });
+      }
+
+      function buildExportConfig(options = {}) {
+        if (!options.skipSnapshot) snapshotCurrentText();
+
+        const modes = {};
+        const preview_urls = {};
+
+        Object.values(modeOptions).forEach((key) => {
+          ensureModeExists(key, titleByModeKey(key));
+          const data = configByMode[key] || createDefaultPrompt(modeDef(key));
+          data.preview_urls = data.preview_urls || {};
+          modes[key] = data;
+          preview_urls[key] = {
+            variant_a: data.preview_urls.variant_a || "",
+            variant_b: data.preview_urls.variant_b || "",
+            variant_c: data.preview_urls.variant_c || ""
+          };
+        });
+
+        return {
+          plugin_version: appState.pluginVersion || DEFAULT_PLUGIN_VERSION,
+          version: Date.now(),
+          description: "Hrio Design 设计师模板生成节点提示词配置。支持模板增删改复制、OSS 预览图、预览同步和真实重试。",
+          updated_at: new Date().toISOString(),
+          designer_type_options: DESIGNER_TYPE_OPTIONS,
+          output_strategy_options: OUTPUT_STRATEGY_OPTIONS,
+          creativity_options: CREATIVITY_OPTIONS,
+          theme_skins: THEME_SKINS,
+          mode_options: modeOptions,
+          mode_meta: modeMeta,
+          preview_urls,
+          modes,
+          global_negative_prompt: "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格，不要促销标签，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要杂乱拼贴，不要廉价滤镜。"
+        };
+      }
+
+      async function postConfig(payload, showToast = true) {
+        for (const route of CONFIG_POST_ROUTES) {
+          try {
+            const resp = await fetch(route, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const json = await resp.json().catch(() => ({}));
+            const saved = json.prompt_config || json.config || payload;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            setStatus(`配置状态：已保存到 ${route}`);
+            setDirty(false);
+            if (showToast) toast("配置已保存");
+            return true;
+          } catch (error) {
+            console.warn("save failed:", route, error);
+          }
+        }
+        setStatus("配置状态：后端不可写，已保存到本地缓存");
+        return false;
+      }
+
+      async function saveConfig() {
+        snapshotCurrentText();
+        const payload = buildExportConfig({ skipSnapshot: true });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        publishSync("manual_save", false);
+
+        const ok = await postConfig(payload, true);
+        if (!ok) {
+          downloadJson(payload, "banana_designer_prompts.json");
+          toast("后端不可写，已导出 JSON；文件内包含 OSS 预览图 URL");
+        }
+      }
+
+      function resetCurrentMode() {
+        const oldPreview = getCurrentModeData().preview_urls || {};
+        configByMode[currentModeKey] = deepClone(DEFAULT_PROMPTS[currentModeKey] || createDefaultPrompt(modeDef(currentModeKey)));
+        configByMode[currentModeKey].preview_urls = oldPreview;
+        renderAll();
+        setDirty(true);
+        publishSync("reset_mode", true);
+        toast("当前模板已恢复默认，OSS 预览图已保留");
+      }
+
+      function clearLocalCache() {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(UI_STATE_KEY);
+        localStorage.removeItem(LIVE_CONFIG_KEY);
+        setStatus("配置状态：本地缓存已清空");
+        toast("已清空本地缓存");
+      }
+
+      function copyText(text, message) {
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(text).then(() => toast(message || "已复制"), () => fallbackCopy(text, message));
+        } else {
+          fallbackCopy(text, message);
+        }
+      }
+
+      function fallbackCopy(text, message) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        toast(message || "已复制");
+      }
+
+      function downloadJson(data, filename) {
+        downloadText(JSON.stringify(data, null, 2), filename, "application/json;charset=utf-8");
+      }
+
+      function downloadText(text, filename, type = "text/plain;charset=utf-8") {
+        const blob = new Blob([text], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      async function importConfigFile(file) {
+        if (!file) return;
+        try {
+          const json = JSON.parse(await file.text());
+          normalizeLoadedConfig(json);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+          ensureCurrentModeValid();
+          renderAll();
+          setDirty(true);
+          publishSync("import_config", true);
+          toast("配置已导入，模板与 OSS 预览图已更新");
+        } catch {
+          toast("导入失败：不是有效 JSON");
+        }
+      }
+
+      function composeFullPrompt() {
+        snapshotCurrentText();
+        const data = getCurrentModeData();
+        const title = titleByModeKey(currentModeKey);
+        return [
+          `【${title}】`,
+          "",
+          `【参考图说明】`,
+          data.image_roles || "",
+          "",
+          `【全局任务】`,
+          data.global_prompt || "",
+          "",
+          `【方案 A】`,
+          data.variant_a_prompt || "",
+          "",
+          `【方案 B】`,
+          data.variant_b_prompt || "",
+          "",
+          `【方案 C】`,
+          data.variant_c_prompt || "",
+          "",
+          `【一致性要求】`,
+          data.consistency_prompt || "",
+          "",
+          `【反向约束】`,
+          data.negative_prompt || ""
+        ].join("\n");
+      }
+
+      function currentModeJson() {
+        snapshotCurrentText();
+        return {
+          title: titleByModeKey(currentModeKey),
+          key: currentModeKey,
+          meta: modeMeta[currentModeKey],
+          ...getCurrentModeData()
+        };
+      }
+
+      function openModeModal(type = "add") {
+        appState.modeModalType = type;
+        const def = modeDef(currentModeKey);
+
+        $("#modeModalTitle").textContent = type === "edit" ? "编辑当前模板" : "新增模板";
+        $("#modeTitleInput").value = type === "edit" ? titleByModeKey(currentModeKey) : "";
+        $("#modeKeyInput").value = type === "edit" ? currentModeKey : "";
+        $("#modeKeyInput").disabled = type === "edit";
+        $("#modeDesignerInput").value = type === "edit" ? def.designer_type : appState.designer;
+        $("#modeIconInput").value = type === "edit" ? def.icon : "新";
+        $("#modeDescInput").value = type === "edit" ? def.desc : "自定义设计模板。";
+
+        $("#modeModal").classList.add("show");
+      }
+
+      function closeModeModal() {
+        $("#modeModal").classList.remove("show");
+      }
+
+      function slugify(value) {
+        const raw = String(value || "").trim().toLowerCase();
+        const ascii = raw
+          .replace(/[^\w\s-]/g, "")
+          .replace(/\s+/g, "_")
+          .replace(/-+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        return ascii || `custom_mode_${Date.now()}`;
+      }
+
+      function saveModeFromModal() {
+        const type = appState.modeModalType;
+        const title = $("#modeTitleInput").value.trim();
+        const key = type === "edit" ? currentModeKey : slugify($("#modeKeyInput").value || title);
+        const designerType = $("#modeDesignerInput").value;
+        const icon = $("#modeIconInput").value.trim() || title.slice(0, 1) || "新";
+        const desc = $("#modeDescInput").value.trim() || "自定义设计模板。";
+
+        if (!title) {
+          toast("请填写模板名称");
+          return;
+        }
+
+        if (type !== "edit" && configByMode[key]) {
+          toast("模板 Key 已存在，请换一个");
+          return;
+        }
+
+        if (type === "edit") {
+          Object.keys(modeOptions).forEach((name) => {
+            if (modeOptions[name] === currentModeKey && name !== title) delete modeOptions[name];
+          });
+        }
+
+        modeOptions[title] = key;
+        modeMeta[key] = {
+          ...(modeMeta[key] || {}),
+          title,
+          designer_type: designerType,
+          icon,
+          desc,
+          variants: modeMeta[key]?.variants || createFallbackVariants(key)
+        };
+
+        if (!configByMode[key]) {
+          configByMode[key] = createDefaultPrompt(modeMeta[key]);
+        }
+
+        configByMode[key].designer_type = designerType;
+        configByMode[key].preview_urls = configByMode[key].preview_urls || {};
+
+        currentModeKey = key;
+        appState.designer = designerType;
+        currentField = "image_roles";
+        appState.selectedVariantKey = getVariants(key)[0]?.key || "variant_a";
+
+        closeModeModal();
+        renderAll();
+        setDirty(true);
+        publishSync(type === "edit" ? "edit_mode" : "add_mode", true);
+        toast(type === "edit" ? "模板已更新" : "模板已新增，可上传预览图");
+      }
+
+      function duplicateCurrentMode() {
+        snapshotCurrentText();
+
+        const oldTitle = titleByModeKey(currentModeKey);
+        const newTitle = `${oldTitle} 副本`;
+        const newKey = `${currentModeKey}_copy_${Date.now()}`;
+
+        modeOptions[newTitle] = newKey;
+        modeMeta[newKey] = {
+          ...deepClone(modeMeta[currentModeKey] || modeDef(currentModeKey)),
+          title: newTitle
+        };
+        configByMode[newKey] = deepClone(getCurrentModeData());
+
+        currentModeKey = newKey;
+        currentField = "image_roles";
+        appState.selectedVariantKey = getVariants(newKey)[0]?.key || "variant_a";
+
+        renderAll();
+        setDirty(true);
+        publishSync("duplicate_mode", true);
+        toast("已复制当前模板，提示词和 OSS 预览图已一起复制");
+      }
+
+      function deleteCurrentMode() {
+        const sameDesignerKeys = Object.values(modeOptions).filter((key) => modeDef(key).designer_type === appState.designer);
+        if (sameDesignerKeys.length <= 1) {
+          toast("当前设计方向至少保留一个模板");
+          return;
+        }
+
+        const title = titleByModeKey(currentModeKey);
+        if (!confirm(`确定删除「${title}」吗？`)) return;
+
+        Object.keys(modeOptions).forEach((name) => {
+          if (modeOptions[name] === currentModeKey) delete modeOptions[name];
+        });
+        delete modeMeta[currentModeKey];
+        delete configByMode[currentModeKey];
+
+        currentModeKey = Object.values(modeOptions).find((key) => modeDef(key).designer_type === appState.designer) || Object.values(modeOptions)[0];
+        currentField = "image_roles";
+        appState.selectedVariantKey = getVariants(currentModeKey)[0]?.key || "variant_a";
+
+        renderAll();
+        setDirty(true);
+        publishSync("delete_mode", true);
+        toast("模板已删除");
+      }
+
+      function makeApiUrl(base, route) {
+        const b = String(base || "").replace(/\/+$/, "");
+        const r = String(route || "");
+        if (!b) return r;
+        if (r.startsWith("/api/") && b.endsWith("/api")) return b + r.slice(4);
+        return b + r;
+      }
+
+      async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      function extractNested(obj, keys) {
+        if (!obj || typeof obj !== "object") return "";
+        for (const key of keys) if (obj[key]) return obj[key];
+        for (const item of [obj.data, obj.result, obj.file, obj.upload, obj.oss, obj.payload]) {
+          if (!item || typeof item !== "object") continue;
+          for (const key of keys) if (item[key]) return item[key];
+        }
+        return "";
+      }
+
+      function extractPublicUrl(data) {
+        return extractNested(data, ["url", "oss_url", "ossUrl", "public_url", "publicUrl", "file_url", "fileUrl", "download_url", "downloadUrl", "preview_url", "previewUrl", "cdn_url", "cdnUrl"]);
+      }
+
+      function extractUploadUrl(data) {
+        return extractNested(data, ["upload_url", "uploadUrl", "presigned_url", "presignedUrl", "put_url", "putUrl", "signed_url", "signedUrl"]);
+      }
+
+      function extractPostUrl(data) {
+        return extractNested(data, ["post_url", "postUrl", "host", "url_for_post", "urlForPost"]);
+      }
+
+      function extractFields(data) {
+        return data?.fields || data?.form || data?.formData || data?.data?.fields || data?.data?.form || null;
+      }
+
+      async function uploadBySimpleRoute(file) {
+        for (const base of API_BASE_CANDIDATES) {
+          for (const route of SIMPLE_UPLOAD_ROUTES) {
+            const url = makeApiUrl(base, route);
+            try {
+              const form = new FormData();
+              form.append("file", file);
+              form.append("mode_key", currentModeKey);
+              form.append("mode_title", titleByModeKey(currentModeKey));
+              form.append("variant_key", appState.selectedVariantKey);
+              form.append("folder", `assets/plu/custom/${currentModeKey}`);
+
+              const resp = await fetchWithTimeout(url, { method: "POST", body: form }, 60000);
+              if (!resp.ok) continue;
+
+              const data = await resp.json().catch(() => ({}));
+              const publicUrl = extractPublicUrl(data);
+              if (publicUrl) return publicUrl;
+            } catch (error) {
+              console.warn("simple upload failed:", url, error);
+            }
+          }
+        }
+        return "";
+      }
+
+      async function uploadByPresign(file) {
+        for (const base of API_BASE_CANDIDATES) {
+          for (const route of PRESIGN_ROUTES) {
+            const url = makeApiUrl(base, route);
+            try {
+              const ext = file.name.includes(".") ? file.name.split(".").pop() : "png";
+              const filename = `${currentModeKey}_${appState.selectedVariantKey}_${Date.now()}.${ext}`;
+              const objectKey = `assets/plu/custom/${currentModeKey}/${filename}`;
+
+              const resp = await fetchWithTimeout(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  filename,
+                  file_name: filename,
+                  key: objectKey,
+                  object_key: objectKey,
+                  path: objectKey,
+                  content_type: file.type || "image/png",
+                  mime_type: file.type || "image/png",
+                  size: file.size,
+                  mode_key: currentModeKey,
+                  mode_title: titleByModeKey(currentModeKey),
+                  variant_key: appState.selectedVariantKey,
+                  folder: `assets/plu/custom/${currentModeKey}`
+                })
+              }, 30000);
+
+              if (!resp.ok) continue;
+
+              const data = await resp.json().catch(() => ({}));
+              const uploadUrl = extractUploadUrl(data);
+              const postUrl = extractPostUrl(data);
+              const fields = extractFields(data);
+              const publicUrl = extractPublicUrl(data);
+
+              if (uploadUrl) {
+                const putResp = await fetchWithTimeout(uploadUrl, {
+                  method: "PUT",
+                  headers: { "Content-Type": file.type || "application/octet-stream" },
+                  body: file
+                }, 90000);
+                if (!putResp.ok) throw new Error(`PUT OSS failed HTTP ${putResp.status}`);
+                return publicUrl || String(uploadUrl).split("?")[0];
+              }
+
+              if (postUrl && fields && typeof fields === "object") {
+                const form = new FormData();
+                Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+                form.append("file", file);
+
+                const postResp = await fetchWithTimeout(postUrl, { method: "POST", body: form }, 90000);
+                if (!postResp.ok) throw new Error(`POST OSS failed HTTP ${postResp.status}`);
+                return publicUrl || `${String(postUrl).replace(/\/+$/, "")}/${fields.key || objectKey}`;
+              }
+
+              if (publicUrl) return publicUrl;
+            } catch (error) {
+              console.warn("presign upload failed:", url, error);
+            }
+          }
+        }
+        return "";
+      }
+
+      async function uploadPreviewFile(file) {
+        const simple = await uploadBySimpleRoute(file);
+        if (simple) return simple;
+        const presign = await uploadByPresign(file);
+        if (presign) return presign;
+        throw new Error("上传失败：没有可用上传接口，或接口没有返回 URL");
+      }
+
+      async function handlePreviewUpload(file) {
+        if (!file) return;
+        try {
+          toast("正在上传预览图到 OSS...");
+          const url = await uploadPreviewFile(file);
+          const data = getCurrentModeData();
+          data.preview_urls = data.preview_urls || {};
+          data.preview_urls[appState.selectedVariantKey] = url;
+          setDirty(true);
+          renderPreview();
+          publishSync("upload_preview", true);
+          toast("预览图已上传并写入配置");
+        } catch (error) {
+          console.error(error);
+          toast(error.message || "上传失败");
+        }
+      }
+
+      function bindEvents() {
+        $("#promptText").addEventListener("input", () => {
+          getCurrentModeData()[currentField] = $("#promptText").value;
+          $("#charCount").textContent = `${$("#promptText").value.length} 字符`;
+          setDirty(true);
+          cacheConfig();
+          publishSync("input", true);
+        });
+
+        $$(".designer-btn").forEach((btn) => {
+          btn.onclick = () => {
+            snapshotCurrentText();
+            appState.designer = btn.dataset.designer;
+            restoreBuiltInModes();
+            ensureCurrentModeValid();
+            saveUiState();
+            renderAll();
+            publishSync("switch_designer", true);
+          };
+        });
+
+        $$(".skin-toggle button").forEach((btn) => {
+          btn.onclick = () => {
+            appState.skinKey = btn.dataset.skin;
+            saveUiState();
+            renderSkin();
+          };
+        });
+
+        $$(".preview-switch button").forEach((btn) => {
+          btn.onclick = () => {
+            appState.previewMode = btn.dataset.previewMode;
+            saveUiState();
+            renderPreview();
+            if (appState.previewMode !== "template") refreshRuntime();
+          };
+        });
+
+        $("#saveBtn").onclick = saveConfig;
+        $("#exportBtn").onclick = () => downloadJson(buildExportConfig(), "banana_designer_prompts.json");
+        $("#importBtn").onclick = () => $("#importFile").click();
+        $("#importFile").onchange = (event) => {
+          importConfigFile(event.target.files?.[0]);
+          event.target.value = "";
+        };
+
+        $("#resetModeBtn").onclick = resetCurrentMode;
+        $("#clearLocalBtn").onclick = clearLocalCache;
+        $("#addModeBtn").onclick = () => openModeModal("add");
+        $("#editModeBtn").onclick = () => openModeModal("edit");
+        $("#copyModeBtn").onclick = duplicateCurrentMode;
+        $("#deleteModeBtn").onclick = deleteCurrentMode;
+
+        $("#modeModalCloseBtn").onclick = closeModeModal;
+        $("#modeModal").onclick = (event) => {
+          if (event.target.id === "modeModal") closeModeModal();
+        };
+        $("#modeSaveBtn").onclick = saveModeFromModal;
+        $("#duplicateDefaultPromptBtn").onclick = () => {
+          $("#modeDescInput").value = modeDef(currentModeKey).desc;
+          toast("已套用当前模板描述；保存后会复制当前提示词");
+        };
+
+        $("#copyCurrentBtn").onclick = () => copyText(getCurrentModeData()[currentField] || "", "已复制当前字段");
+        $("#copyFullPromptBtn").onclick = () => copyText(composeFullPrompt(), "已复制整组提示词");
+        $("#copyCurrentJsonBtn").onclick = () => copyText(JSON.stringify(currentModeJson(), null, 2), "已复制当前模板 JSON");
+        $("#exportPromptTxtBtn").onclick = () => downloadText(composeFullPrompt(), `${currentModeKey}_prompt.txt`);
+
+        $("#refreshRuntimeBtn").onclick = () => refreshRuntime(true);
+        $("#retryCurrentBtn").onclick = () => sendRetryCommand("retry_one");
+        $("#retryAllBtn").onclick = () => sendRetryCommand("retry_all");
+        $("#retryFailedBtn").onclick = () => sendRetryCommand("retry_failed");
+        $("#clearRuntimeBtn").onclick = clearRuntime;
+
+        $("#autoRetryToggle").onchange = (event) => {
+          appState.autoRetry = Boolean(event.target.checked);
+          saveUiState();
+          toast(appState.autoRetry ? "已开启报错自动重抽" : "已关闭报错自动重抽");
+        };
+
+        $("#previewStage").onclick = (event) => {
+          if (event.target.closest("button")) return;
+          const variant = getCurrentVariant();
+          const src = previewSourceForVariant(variant);
+          openImageModal(`${variant.label} · ${variant.name}`, src.url, [
+            `模板：${titleByModeKey(currentModeKey)}`,
+            `方案：${variant.label} · ${variant.name}`,
+            `来源：${src.source}`,
+            "",
+            src.url
+          ].join("\n"), currentVariantPayload("retry_one"));
+        };
+
+        $("#uploadPreviewBtn").onclick = (event) => {
+          event.stopPropagation();
+          $("#previewUploadFile").click();
+        };
+
+        $("#previewUploadFile").onchange = (event) => {
+          handlePreviewUpload(event.target.files?.[0]);
+          event.target.value = "";
+        };
+
+        $("#modalCloseBtn").onclick = closeModal;
+        $("#resultModal").onclick = (event) => {
+          if (event.target.id === "resultModal") closeModal();
+        };
+        $("#modalCopyBtn").onclick = () => copyText(appState.lastModalText || $("#modalText").textContent || "", "已复制详情");
+        $("#modalCopyUrlBtn").onclick = () => copyText(appState.lastModalImageUrl || "", "已复制图片 URL");
+        $("#modalCopyPromptBtn").onclick = () => copyText(composeFullPrompt(), "已复制当前模板提示词");
+        $("#modalRetryBtn").onclick = () => {
+          const payload = appState.lastModalRetryPayload || currentVariantPayload("retry_one");
+          sendCommand({
+            type: "retry",
+            ...payload,
+            prompt_config: buildExportConfig({ skipSnapshot: false }),
+            current_mode_config: getCurrentModeData()
+          });
+          toast("已发送当前图重抽命令");
+        };
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            closeModal();
+            closeModeModal();
+          }
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+            event.preventDefault();
+            saveConfig();
+          }
+        });
+      }
+
+      async function init() {
+        bindEvents();
+        await loadConfig();
+        await refreshRuntime(false);
+        setInterval(() => refreshRuntime(false), 5000);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

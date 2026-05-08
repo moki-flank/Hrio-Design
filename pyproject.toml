@@ -1,0 +1,42 @@
+[project]
+name = "hrio-design"
+version = "1.0.1"
+description = "Independent Hrio Design custom nodes for ComfyUI. Graphic design and interior design prompt editor, single image node, single video node, and three-variant design generation."
+license = { text = "Proprietary" }
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "numpy",
+    "pillow"
+]
+classifiers = [
+    "Operating System :: OS Independent"
+]
+
+[project.urls]
+Repository = "https://github.com/moki-flank/Hrio-Design"
+Documentation = "https://github.com/moki-flank/Hrio-Design"
+"Bug Tracker" = "https://github.com/moki-flank/Hrio-Design/issues"
+
+[tool.comfy]
+PublisherId = "mokiya"
+DisplayName = "Hrio-Design"
+Icon = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/logo.png"
+Banner = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/banner.png"
+includes = [
+    "__init__.py",
+    "banana_logger.py",
+    "banana_update.py",
+    "banana_node.py",
+    "banana_triple_view_node.py",
+    "banana_manifest.json",
+    "banana_designer_prompts.json",
+    "banana_ecommerce_prompts.json",
+    "config.ini",
+    "web/**/*",
+    "logo.png",
+    "banner.png",
+    "README.md",
+    "setup_git_and_push.bat",
+    "setup_git_and_push.sh"
+]

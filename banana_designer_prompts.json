@@ -1,0 +1,181 @@
+{
+  "plugin_version": "8.1.0",
+  "version": 2,
+  "description": "Hrio Design 独立设计师模板提示词配置 v8.1.0。平面设计与室内设计模板完整内置。",
+  "updated_at": "2026-04-27T00:00:00.000Z",
+  "designer_type_options": {
+    "平面设计": "graphic_design",
+    "室内设计": "interior_design"
+  },
+  "output_strategy_options": {
+    "单图生成": "single",
+    "三方案并发": "three_variants",
+    "主图 + 延展 + 细节": "main_extend_detail"
+  },
+  "creativity_options": {
+    "保守": "safe",
+    "平衡": "balanced",
+    "大胆": "bold"
+  },
+  "theme_skins": {
+    "冬之韵淡灰": {
+      "key": "winter_gray",
+      "background_url": "https://img.hrio.site/assets/plu/bg.png",
+      "tone": "淡灰、冰蓝、冬之韵、建筑线稿、克制留白"
+    },
+    "暖砂淡黄": {
+      "key": "warm_yellow",
+      "background_url": "https://img.hrio.site/assets/plu/bg2.png",
+      "tone": "淡黄、暖砂、石膏肌理、柔和室内、自然光感"
+    }
+  },
+  "mode_options": {
+    "平面｜品牌主视觉 KV": "brand_key_visual",
+    "平面｜活动海报 / 宣传海报": "poster_design",
+    "平面｜社媒封面 / 小红书封面": "social_cover",
+    "平面｜网页首屏 / Banner": "web_hero_banner",
+    "平面｜PPT / 提案封面": "proposal_cover",
+    "平面｜品牌视觉延展": "brand_extension",
+    "室内｜空间风格概念图": "space_style_concept",
+    "室内｜室内氛围渲染": "interior_mood_render",
+    "室内｜材质情绪板": "material_moodboard",
+    "室内｜软装搭配方案": "soft_furnishing_plan",
+    "室内｜墙面 / 地面材质替换": "material_replacement",
+    "室内｜灯光氛围调整": "lighting_mood"
+  },
+  "modes": {
+    "brand_key_visual": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 品牌素材 / Logo / 产品主体 / 核心视觉元素；Image 2 = 风格参考；Image 3 = 配色参考；Image 4 = 版式参考；Image 5 = 材质或纹理参考；Image 6 = 背景或场景参考。",
+      "global_prompt": "任务：品牌主视觉 KV。请基于上传的品牌素材与参考图，生成一张高端品牌主视觉。画面需要具备强视觉中心、清晰层级、干净留白、可放置标题与 Logo 的安全区域。整体风格现代、高级、克制，有设计感但不过度复杂。如果提供 Logo 或品牌素材，必须保持其识别性，不要改变结构、文字、比例和品牌色。不要直接生成具体文字，不要生成错误字母。",
+      "variant_a_prompt": "方案 A：极简高级版。留白更多，结构更稳，适合官网首屏、品牌发布、正式商业提案。画面要克制、干净、专业。",
+      "variant_b_prompt": "方案 B：视觉冲击版。增强主视觉的体积、光影、空间和图形张力，适合活动主视觉、发布会 KV、品牌传播主图。",
+      "variant_c_prompt": "方案 C：实验设计版。加入更强的抽象图形、材质层次、空间透视或视觉隐喻，但仍保持高级、可落地、非廉价 AI 感。",
+      "consistency_prompt": "三张图必须属于同一个品牌视觉系统，保持统一的品牌气质、色彩方向、构图秩序和材质语言；只允许创意强度和视觉表达差异。",
+      "negative_prompt": "不要电商白底图，不要价格，不要促销标签，不要购物按钮，不要二维码，不要水印，不要真实文字，不要乱码字体，不要廉价渐变，不要杂乱拼贴，不要低清晰度。",
+      "preview_urls": {}
+    },
+    "poster_design": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 活动主题素材 / 主体图；Image 2 = 风格参考；Image 3 = 配色参考；Image 4 = 海报版式参考；Image 5 = 背景纹理；Image 6 = 其他视觉元素。",
+      "global_prompt": "任务：活动海报 / 宣传海报。请生成一张高审美活动海报背景图。画面需要具备明确主题氛围、主次层级、视觉引导和适合排版的留白区域。不要直接生成文字，只保留标题区、信息区、按钮区的视觉空间。整体要像专业设计师完成的海报底图，而不是普通 AI 插画。",
+      "variant_a_prompt": "方案 A：商业稳定版。构图清晰、层级明确、适合正式发布，标题区和信息区预留干净。",
+      "variant_b_prompt": "方案 B：年轻传播版。视觉更有吸引力，适合社交媒体传播，色彩和节奏更活跃但不廉价。",
+      "variant_c_prompt": "方案 C：艺术实验版。更强的图形张力、材质叠加或空间感，适合展览、艺术活动、视觉提案。",
+      "consistency_prompt": "三张图都必须围绕同一活动主题，保持同一素材逻辑和视觉气质，不要变成三个完全无关的方向。",
+      "negative_prompt": "不要真实文字，不要乱码，不要水印，不要二维码，不要电商促销图，不要过度花哨，不要低端广告风，不要人物脸部畸形。",
+      "preview_urls": {}
+    },
+    "social_cover": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 封面主体 / 产品 / 人物 / 主题素材；Image 2 = 风格参考；Image 3 = 色彩参考；Image 4 = 排版参考；Image 5 = 背景参考；Image 6 = 纹理参考。",
+      "global_prompt": "任务：社媒封面 / 小红书封面。请生成一张适合社交媒体传播的封面背景。画面要有点击吸引力，但不能廉价、不能过度花哨。主体区域清晰，标题区域预留明显，边缘干净，适合后期添加文字。整体具有高级审美、自然光感、柔和但有记忆点。",
+      "variant_a_prompt": "方案 A：高级干净版。适合知识类、设计类、品牌类内容，留白充足，标题区清楚。",
+      "variant_b_prompt": "方案 B：强吸引版。视觉中心更强，适合小红书、短视频封面、社媒传播。",
+      "variant_c_prompt": "方案 C：氛围故事版。增加空间感、生活感或情绪氛围，让封面更有记忆点。",
+      "consistency_prompt": "三张图都需要适合封面使用，主体清晰，标题安全区明确，风格统一但点击吸引力有差异。",
+      "negative_prompt": "不要真实文字，不要水印，不要二维码，不要边缘脏乱，不要过多元素，不要低俗营销感，不要电商价格标签。",
+      "preview_urls": {}
+    },
+    "web_hero_banner": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 产品 / 品牌 / 视觉主体；Image 2 = 风格参考；Image 3 = 配色参考；Image 4 = 网页布局参考；Image 5 = 背景材质；Image 6 = 装饰元素参考。",
+      "global_prompt": "任务：网页首屏 / Banner。请生成一张网页首屏背景图。画面必须适合作为前端背景使用，左侧或中心保留大面积 UI 文案区，右侧可以有视觉装饰。整体干净、现代、高级，有轻微空间感、材质感或抽象图形。不要出现真实文字、按钮、卡片、价格、Logo、水印。",
+      "variant_a_prompt": "方案 A：官网高级版。稳定、干净、留白明确，适合企业官网、设计工作室、SaaS 首屏。",
+      "variant_b_prompt": "方案 B：科技视觉版。增加抽象线条、微光、空间层次或数字感，但保持高端克制。",
+      "variant_c_prompt": "方案 C：品牌氛围版。更强调品牌情绪、材质、自然光影或空间故事感。",
+      "consistency_prompt": "三张图都必须适合作为横屏网页背景，保留 UI 安全区，不要让画面中心过度复杂。",
+      "negative_prompt": "不要真实文字，不要 UI 卡片，不要按钮，不要二维码，不要水印，不要杂乱装饰，不要强电商感，不要过曝。",
+      "preview_urls": {}
+    },
+    "proposal_cover": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 项目主体 / 品牌素材；Image 2 = 提案风格参考；Image 3 = 配色参考；Image 4 = 版式参考；Image 5 = 材质纹理；Image 6 = 背景参考。",
+      "global_prompt": "任务：PPT / 提案封面。请生成一张高端提案封面背景。画面应具有专业咨询公司或设计事务所的提案质感，留白充足，适合放置标题、副标题、日期和 Logo。风格克制、干净、精致，有轻微纹理、光影、纸张感或建筑线条。不要生成任何文字。",
+      "variant_a_prompt": "方案 A：商务咨询版。理性、专业、干净，适合正式项目汇报。",
+      "variant_b_prompt": "方案 B：设计事务所版。更强调审美、纸张肌理、空间线条和高级留白。",
+      "variant_c_prompt": "方案 C：创意提案版。更有视觉记忆点，但仍适合 PPT 封面和客户展示。",
+      "consistency_prompt": "三张图都必须能作为提案封面，标题区域要足够干净，画面不能太满。",
+      "negative_prompt": "不要真实文字，不要水印，不要二维码，不要人物杂乱，不要促销感，不要花哨背景，不要低端模板感。",
+      "preview_urls": {}
+    },
+    "brand_extension": {
+      "designer_type": "graphic_design",
+      "image_roles": "Image 1 = 已有品牌视觉 / 主视觉；Image 2 = 延展风格参考；Image 3 = 应用场景参考；Image 4 = 色彩系统参考；Image 5 = 材质参考；Image 6 = 辅助图形参考。",
+      "global_prompt": "任务：品牌视觉延展。请基于参考图的视觉语言，生成同一品牌系统下的延展视觉。必须保持参考图的色彩气质、构图秩序、图形语言和材质风格。不要复制原图内容，而是生成新的同风格视觉。适合用于品牌物料、网页背景、活动页和宣传图。",
+      "variant_a_prompt": "方案 A：主视觉延展。保持与原视觉最接近，适合系列主图和品牌延展。",
+      "variant_b_prompt": "方案 B：应用场景延展。加入空间、材质或场景，使其适合展示页、品牌应用页。",
+      "variant_c_prompt": "方案 C：抽象系统延展。提取品牌图形语言，生成更抽象、更系统化的视觉资产。",
+      "consistency_prompt": "三张图必须属于同一个品牌视觉系统，保持色彩、图形、材质和气质统一。",
+      "negative_prompt": "不要改变品牌识别，不要生成乱码文字，不要水印，不要二维码，不要电商促销感，不要杂乱拼贴。",
+      "preview_urls": {}
+    },
+    "space_style_concept": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 原始空间图 / 户型图 / 空间照片；Image 2 = 风格参考；Image 3 = 材质参考；Image 4 = 家具软装参考；Image 5 = 灯光参考；Image 6 = 色彩参考。",
+      "global_prompt": "任务：空间风格概念图。请基于上传空间图或风格参考图，生成一张室内空间风格概念图。需要体现清晰的空间气质、材质关系、光影层次和设计调性。保持空间合理，不要出现结构错误、家具畸形、比例失真。整体应像室内设计事务所的概念提案图。",
+      "variant_a_prompt": "方案 A：克制高级版。材质、配色和家具更稳重，适合真实落地和客户沟通。",
+      "variant_b_prompt": "方案 B：温暖生活版。增加生活感、自然光、柔和材质和舒适居住氛围。",
+      "variant_c_prompt": "方案 C：设计张力版。强化空间线条、材质对比、灯光层次和视觉记忆点。",
+      "consistency_prompt": "三张图必须保持同一空间逻辑、同一功能定位和合理尺度，只改变风格表达强度。",
+      "negative_prompt": "不要改变空间尺度逻辑，不要错误透视，不要家具畸形，不要杂乱堆叠，不要廉价样板间感，不要水印，不要文字。",
+      "preview_urls": {}
+    },
+    "interior_mood_render": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 空间照片 / 空间参考；Image 2 = 风格图；Image 3 = 材质图；Image 4 = 家具软装；Image 5 = 灯光氛围；Image 6 = 色彩参考。",
+      "global_prompt": "任务：室内氛围渲染。请生成一张高端室内氛围渲染图。画面需要强调自然光、空间层次、材质细节、软装比例和高级生活感。不要过度堆叠家具，不要杂乱，不要廉价样板间感。整体要安静、克制、舒适，有真实室内摄影质感。",
+      "variant_a_prompt": "方案 A：白天自然光。空间明亮、干净、自然，适合住宅、样板间、设计提案。",
+      "variant_b_prompt": "方案 B：傍晚暖光。更温暖、更有生活感，强调灯光与材质的舒适关系。",
+      "variant_c_prompt": "方案 C：高级静谧。更克制、更艺术化，适合高端住宅、会所、设计展示。",
+      "consistency_prompt": "三张图都应保持同一空间基础和风格方向，重点变化在光线、氛围和情绪。",
+      "negative_prompt": "不要过曝，不要脏乱，不要家具比例错误，不要透视错误，不要过度装饰，不要水印，不要文字。",
+      "preview_urls": {}
+    },
+    "material_moodboard": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 主材参考；Image 2 = 辅材参考；Image 3 = 织物 / 软装参考；Image 4 = 色彩参考；Image 5 = 空间风格参考；Image 6 = 灯光参考。",
+      "global_prompt": "任务：材质情绪板。请生成一张室内设计材质情绪板。画面可以包含石材、木材、织物、金属、玻璃、涂料、纸张、皮革等材质样本。构图要高级、有秩序，不要杂乱拼贴。材质之间要有色彩关系、触感对比和空间设计逻辑。",
+      "variant_a_prompt": "方案 A：主材质板。重点展示石材、木材、墙面、地面等主要材质关系。",
+      "variant_b_prompt": "方案 B：软装搭配板。重点展示织物、皮革、金属、装饰材料和配色关系。",
+      "variant_c_prompt": "方案 C：局部细节板。放大材质肌理、纹理、边缘、阴影和触感细节。",
+      "consistency_prompt": "三张图必须属于同一套室内设计材质系统，色彩和材质气质保持统一。",
+      "negative_prompt": "不要杂乱拼贴，不要低端商品陈列图，不要价格标签，不要真实文字，不要水印，不要二维码，不要低端素材堆叠。",
+      "preview_urls": {}
+    },
+    "soft_furnishing_plan": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 空间照片；Image 2 = 家具参考；Image 3 = 布艺参考；Image 4 = 灯具参考；Image 5 = 装饰画 / 摆件参考；Image 6 = 色彩参考。",
+      "global_prompt": "任务：软装搭配方案。请基于空间图或风格参考，生成一张软装搭配方案图。保持空间结构合理，重点调整家具、布艺、灯具、地毯、装饰画和摆件。软装之间需要有统一色彩系统和材质呼应。不要改变空间硬装结构，不要生成过多无关家具。",
+      "variant_a_prompt": "方案 A：克制高级。家具数量少但质感强，空间留白更明显。",
+      "variant_b_prompt": "方案 B：温暖生活。软装更柔和，布艺、地毯、灯具更有居住氛围。",
+      "variant_c_prompt": "方案 C：设计感强化。增加艺术灯具、装饰画、雕塑感家具或更强材质对比。",
+      "consistency_prompt": "三张图都必须保持原空间结构和尺度合理，变化只发生在软装、家具、灯具和材质搭配。",
+      "negative_prompt": "不要改变门窗结构，不要家具漂浮，不要比例错误，不要杂乱摆放，不要廉价软装，不要水印，不要文字。",
+      "preview_urls": {}
+    },
+    "material_replacement": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 原始空间图；Image 2 = 墙面材质参考；Image 3 = 地面材质参考；Image 4 = 石材 / 木饰面参考；Image 5 = 灯光参考；Image 6 = 整体风格参考。",
+      "global_prompt": "任务：墙面 / 地面材质替换。请在保持原空间结构、透视、门窗位置和家具比例不变的前提下，仅替换墙面或地面材质。材质应真实贴合空间光影和透视，不要漂浮、错位、变形。如果上传了材质参考图，必须参考其纹理、颜色、颗粒和表面质感。",
+      "variant_a_prompt": "方案 A：墙面材质替换。重点调整墙面、背景墙、艺术漆、石材或木饰面。",
+      "variant_b_prompt": "方案 B：地面材质替换。重点调整地砖、木地板、微水泥或石材地面。",
+      "variant_c_prompt": "方案 C：墙地整体协调。统一墙面、地面和局部材质，让空间更完整高级。",
+      "consistency_prompt": "三张图必须保持原始空间结构、透视和家具尺度不变，只调整材质系统。",
+      "negative_prompt": "不要改变空间结构，不要改变门窗位置，不要材质贴图错位，不要纹理变形，不要家具畸形，不要水印，不要文字。",
+      "preview_urls": {}
+    },
+    "lighting_mood": {
+      "designer_type": "interior_design",
+      "image_roles": "Image 1 = 原始空间图；Image 2 = 灯光参考；Image 3 = 材质参考；Image 4 = 色温参考；Image 5 = 家具软装参考；Image 6 = 氛围参考。",
+      "global_prompt": "任务：灯光氛围调整。请在保持空间结构和家具布局不变的前提下，重新设计灯光氛围。重点调整自然光、间接光、局部重点照明和整体色温。画面要真实、柔和、有层次，不要过曝，不要霓虹廉价感。",
+      "variant_a_prompt": "方案 A：白天自然光。自然、明亮、通透，强调窗光和材质真实感。",
+      "variant_b_prompt": "方案 B：傍晚暖光。温暖、舒适、有生活气息，强调灯带、壁灯、台灯和间接照明。",
+      "variant_c_prompt": "方案 C：夜间高级氛围。更安静、更克制，强调重点照明、层次阴影和高端空间质感。",
+      "consistency_prompt": "三张图必须保持原空间结构和家具布局不变，只改变灯光气氛、色温和光影层次。",
+      "negative_prompt": "不要过曝，不要强霓虹，不要廉价 KTV 光效，不要改变空间结构，不要家具变形，不要水印，不要文字。",
+      "preview_urls": {}
+    }
+  },
+  "global_negative_prompt": "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格，不要促销标签，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要杂乱拼贴，不要廉价滤镜。"
+}

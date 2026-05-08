@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ComfyUI local runtime/cache
+banana_state.json
+hrio_design_state.json
+banana_automation_history.json
+hrio_design_automation_history.json
+.banana_backups/
+*.tmp
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
