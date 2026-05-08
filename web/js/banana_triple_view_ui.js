@@ -8,14 +8,21 @@
   const AUTOMATION_HISTORY_ROUTE = "/hrio-design/automation/history";
   const AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/automation/history-clear";
   const CONFIG_ROUTE = "/hrio-design/config";
-  const OLD_EDITOR_ROUTES = [];
-  const EDITOR_ROUTE_CANDIDATES = [EDITOR_ROUTE, ...OLD_EDITOR_ROUTES];
+  const OLD_EDITOR_ROUTES = [
+    "/banana/designer-template-editor",
+    "/banana/triple-view-editor",
+    "/banana/prompt-editor",
+    "/banana/ecommerce-editor",
+    "/ai-ecommerce/editor",
+  ];
+  // 不使用 spread，避免部分 ComfyUI Desktop 前端/打包器把 ... 转写异常导致整个扩展脚本不执行。
+  const EDITOR_ROUTE_CANDIDATES = [EDITOR_ROUTE].concat(OLD_EDITOR_ROUTES);
 
   const PANEL_ID = "hrio-design-image-launcher";
   const STYLE_ID = "hrio-design-image-style";
   const MODAL_ID = "hrio-design-automation-modal";
   const EDITOR_MODAL_ID = "hrio-design-editor-modal";
-  const EXTENSION_NAME = "hrio.design.bridge.v8_1_0";
+  const EXTENSION_NAME = "hrio.design.bridge.v8_1_5";
 
   const COMMAND_CHANNEL = "hrio_design_three_view_bridge";
   const DESIGNER_COMMAND_CHANNEL = "hrio_design_template_bridge";
@@ -933,13 +940,13 @@
         <div class="wr-logo">🎨</div>
         <div class="wr-title">
           <strong>Hrio Design｜设计师生成</strong>
-          <span>平面设计 · 室内设计 · 模板同步</span>
+          <span>平面设计 · 室内设计 · 提示词手动 · 自动化全节点</span>
         </div>
       </div>
 
       <div class="wr-state" title="节点同步状态">
         <span class="wr-dot"></span>
-        <span data-state-text>自动同步已启用</span>
+        <span data-state-text>提示词只同步模板节点，自动化全节点</span>
       </div>
 
       <div class="wr-grid compact">
@@ -950,7 +957,7 @@
       </div>
 
       <div class="wr-foot compact">
-        节点自动同步已默认启用；会同步模板提示词到设计师模板、普通单图、普通三方案、生视频节点。
+        提示词配置只同步 Hrio Design 设计师模板面板节点；普通单图、普通三方案、普通视频和视频生成节点的手动提示词不会被覆盖；自动化 payload 仍会应用到所有带 automation_payload 的节点。
       </div>
     `;
 
@@ -1421,24 +1428,14 @@
   }
 
   function applyDesignerPromptsToNode(node, kind, promptPack) {
-    if (!node || !promptPack) return;
-
-    if (kind === "normal") {
-      setWidgetValue(node, ["front_prompt", "正面图提示词", "方案A提示词", "方案 A"], promptPack.variantA);
-      setWidgetValue(node, ["side_prompt", "侧面图提示词", "方案B提示词", "方案 B"], promptPack.variantB);
-      setWidgetValue(node, ["back_prompt", "背面图提示词", "方案C提示词", "方案 C"], promptPack.variantC);
-      setWidgetValue(node, ["global_prompt", "通用提示词", "全局提示词"], promptPack.globalPrompt);
-      setWidgetValue(node, ["negative_prompt", "负面提示词"], promptPack.negativePrompt);
-    } else if (kind === "normal_single") {
-      setWidgetValue(node, ["prompt", "提示词"], promptPack.single);
-      setWidgetValue(node, ["negative_prompt", "负面提示词"], promptPack.negativePrompt);
-    } else if (kind === "normal_video" || kind === "video") {
-      setWidgetValue(node, ["prompt", "提示词"], promptPack.video);
-    }
+    // v8.1.3：只允许“设计师模板面板节点”接收模板配置同步。
+    // 普通单图、普通三方案、普通生视频、独立视频生成节点全部保持用户手动输入，
+    // 不再被右下角面板、打开面板、刷新配置、重抽、自动化等动作覆盖提示词。
+    if (!node || !promptPack || kind !== "panel") return;
 
     try {
       node.properties = node.properties || {};
-      node.properties["hrio_design_prompt_synced"] = true;
+      node.properties["hrio_design_template_synced_only"] = true;
       node.properties["hrio_design_prompt_synced_at"] = Date.now();
     } catch {}
   }
@@ -1448,11 +1445,11 @@
     const modeOptions = command.mode_options || config.mode_options || {};
     const modeTitle = command.current_mode_title || firstTitleByKey(modeOptions, command.current_mode_key) || "";
     const modeKey = command.current_mode_key || modeOptions[modeTitle] || "";
-    const nodes = targetNodes();
+    const nodes = targetNodes().filter((node) => bananaNodeKind(node) === "panel");
     const promptPack = buildDesignerNodePrompts(command, config, modeKey, modeTitle);
 
     if (!nodes.length) {
-      setLauncherState("未找到 Hrio Design 相关节点，请先添加设计师模板 / 普通单图 / 普通三方案 / 生视频节点", "error");
+      setLauncherState("未找到 Hrio Design 设计师模板节点，请先添加“🎨 Hrio Design｜设计师模板面板”", "error");
       return;
     }
 
@@ -1480,8 +1477,8 @@
     beautifyTargetNodes();
 
     state.lastConfig = config;
-    setLauncherState(`已同步设计师提示词：${modeTitle || modeKey || "配置"}`, "syncing");
-    setTimeout(() => setLauncherState("Hrio Design 节点已自动同步", "ok"), 900);
+    setLauncherState(`已同步模板节点：${modeTitle || modeKey || "配置"}`, "syncing");
+    setTimeout(() => setLauncherState("普通节点保持手动输入，不会被覆盖", "ok"), 900);
   }
 
   function applyRetryToNodes(command) {
@@ -1489,26 +1486,33 @@
     const modeKey = command.mode_key || command.current_mode_key || "";
     const view = command.view || command.variant_key || "all";
     const scope = VIEW_SCOPE_MAP[view] || VIEW_SCOPE_MAP.all;
-    const nodes = targetNodes();
+    const nodes = automationWidgetNodes();
     const config = command.config || command.prompt_config || state.lastConfig || {};
     const promptPack = buildDesignerNodePrompts(command, config, modeKey, modeTitle);
 
     if (!nodes.length) {
-      setLauncherState("未找到 Hrio Design 相关节点", "error");
+      setLauncherState("未找到 Hrio Design 自动化节点", "error");
       return;
     }
 
     nodes.forEach((node) => {
-      if (!isTemplateNode(node)) return;
+      const kind = bananaNodeKind(node);
 
-      if (modeTitle) {
-        setWidgetValue(node, ["mode", "模式", "生成模式", "提示词模板"], modeTitle);
+      // 模板相关 mode / labels 只写模板面板；普通节点保持手动。
+      if (kind === "panel") {
+        if (modeTitle) {
+          setWidgetValue(node, ["mode", "模式", "生成模式", "提示词模板"], modeTitle);
+        }
+
+        if (modeKey) {
+          setWidgetValue(node, ["mode_actual", "mode_key", "模式key"], modeKey);
+        }
+
+        setWidgetValue(node, ["labels_prefix", "label_prefix", "标题前缀"], modeTitle || modeKey);
+        applyDesignerPromptsToNode(node, kind, promptPack);
       }
 
-      if (modeKey) {
-        setWidgetValue(node, ["mode_actual", "mode_key", "模式key"], modeKey);
-      }
-
+      // 自动化 / 重跑范围是全节点：只要节点有对应 widget 就写入。
       setWidgetValue(node, ["generate_scope", "生成范围", "重跑范围"], scope);
 
       const automationPayload = parseAutomationPayloadFromNode(node);
@@ -1522,13 +1526,10 @@
           setWidgetValue(node, ["cache_key", "缓存key"], cacheKey);
         }
       }
-
-      setWidgetValue(node, ["labels_prefix", "label_prefix", "标题前缀"], modeTitle || modeKey);
-      applyDesignerPromptsToNode(node, bananaNodeKind(node), promptPack);
     });
 
     beautifyTargetNodes();
-    setLauncherState(`重跑：${scope}`, "syncing");
+    setLauncherState(`全节点自动化重跑：${scope}`, "syncing");
 
     if (
       command.action === "retry_all" ||
@@ -1763,7 +1764,7 @@
         current_mode_config: modeKey && config.modes ? config.modes[modeKey] : null,
       });
 
-      setLauncherState("自动同步已启用", "ok");
+      setLauncherState("提示词只同步模板节点；自动化保持全节点", "ok");
       return true;
     } catch (error) {
       console.warn("[Hrio Design] auto sync config failed:", error);
@@ -1787,7 +1788,7 @@
           if (!isTemplateNode(node)) return;
           setTimeout(() => {
             beautifyTargetNodes();
-            if (isAutomationHardClearMode()) forceSetAutomationWidgetValue(node, "");
+            if (bananaNodeKind(node) === "panel" && isAutomationHardClearMode()) forceSetAutomationWidgetValue(node, "");
           }, 60);
         },
 
@@ -2493,6 +2494,9 @@
   }
 
   function automationWidgetNodes() {
+    // v8.1.5：自动化 payload 是全节点能力。
+    // 只要节点本身带 automation_payload / 自动化映射 widget，就参与应用与清除；
+    // 但普通单图、普通三方案、普通视频和视频生成节点的 prompt / negative_prompt 仍保持用户手动输入，绝不被模板面板覆盖。
     return allNodes().filter((node) => {
       if (isTemplateNode(node)) return true;
       return !!findWidget(node, ["automation_payload", "自动化映射"]);
@@ -2584,7 +2588,7 @@
 
     if (announce) {
       setLauncherState(`已清除自动化：${nodes.length} 个节点`, "ok");
-      setTimeout(() => setLauncherState("节点 automation_payload 已清空；旧工作流载入后也会自动压掉旧 JSON", "ok"), 1000);
+      setTimeout(() => setLauncherState("全节点 automation_payload 已清空；普通节点提示词保持不变", "ok"), 1000);
     }
   }
 
@@ -2603,7 +2607,7 @@
     // 只有主动应用/跑本组/跑全部时才退出“强清除模式”。
     removeAutomationClearFlag();
 
-    payload = { ...payload, created_at: createdAt || now, enabled: payload.enabled !== false };
+    payload = Object.assign({}, payload, { created_at: createdAt || now, enabled: payload.enabled !== false });
     try {
       localStorage.setItem(AUTOMATION_STORAGE_KEY, JSON.stringify(payload));
     } catch {}
@@ -2649,7 +2653,7 @@
     if (announce) {
       const groupCount = Array.isArray(payload.preview_groups) && payload.preview_groups.length ? payload.preview_groups.length : "未预览";
       setLauncherState(`自动化已应用：${groupCount} 组 / ${appliedCount} 个节点`, "syncing");
-      setTimeout(() => setLauncherState("模板节点已自动美化", "ok"), 1200);
+      setTimeout(() => setLauncherState("自动化已应用到全部可自动化节点", "ok"), 1200);
     }
   }
 
@@ -2746,8 +2750,8 @@
   }
 
   function init() {
-    if (window.__BANANA_WINTER_RHYME_IMAGE_BRIDGE_V713__) return;
-    window.__BANANA_WINTER_RHYME_IMAGE_BRIDGE_V713__ = true;
+    if (window.__HRIO_DESIGN_BRIDGE_V815__) return;
+    window.__HRIO_DESIGN_BRIDGE_V815__ = true;
 
     createLauncher();
     setupCommandBridge();

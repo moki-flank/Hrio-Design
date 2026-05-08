@@ -56,7 +56,7 @@ CONFIG_DEFAULTS: Dict[str, str] = {
     "always_sync_files": "false",
 }
 
-PLUGIN_VERSION = "8.1.0"
+PLUGIN_VERSION = "8.1.4"
 
 PANEL_NODE_KEY = "Hrio_Design_Template_Node"
 NORMAL_NODE_KEY = "Hrio_Design_Three_View_Node"

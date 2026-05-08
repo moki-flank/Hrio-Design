@@ -27,7 +27,7 @@ LEGACY_API_BASE_URLS = {
 }
 
 DEFAULT_MANIFEST: Dict[str, Any] = {
-    "plugin_version": "8.1.0",
+    "plugin_version": "8.1.4",
     "schema_version": 1,
     "config_defaults": {
         "base_url": DEFAULT_REMOTE_API_BASE_URL,
@@ -317,7 +317,7 @@ def _request_get(url: str, *, timeout: float, verify_ssl: bool, binary: bool = F
     headers = {
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-        "User-Agent": f"HrioDesignPluginUpdater/8.1.0?ts={int(time.time())}",
+        "User-Agent": f"HrioDesignPluginUpdater/8.1.4?ts={int(time.time())}",
     }
 
     cache_buster = f"_banana_ts={int(time.time() * 1000)}"

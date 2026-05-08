@@ -1,9 +1,9 @@
 {
-  "plugin_version": "8.1.0",
+  "plugin_version": "8.1.4",
   "schema_version": 1,
   "name": "Hrio-Design",
   "display_name": "Hrio Design 独立设计师节点",
-  "description": "Hrio Design 独立 ComfyUI 插件 v8.1.0：节点 Key 全部改为 Hrio_Design_*，避免与旧 hrio-commerce/Banana 插件冲突；新增 GitHub 自动发布 workflow 和一键推送脚本。",
+  "description": "Hrio Design 独立插件 v8.1.4：普通单图、普通三方案、普通视频、视频生成节点全部保持手动提示词，不再被模板面板强制覆盖；自动化 payload 仍应用到所有带 automation_payload 的节点。",
   "config_defaults": {
     "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/hrio_design_manifest.json",
     "base_url": "https://zheshihouduan.tenx-jingli.cloud/api/",
@@ -102,5 +102,6 @@
     "single_image": "Hrio_Design_Single_Image_Node",
     "single_video": "Hrio_Design_Single_Video_Node",
     "video": "Hrio_Design_Video_Node"
-  }
+  },
+  "version": 813
 }

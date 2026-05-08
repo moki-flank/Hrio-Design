@@ -1,6 +1,6 @@
 ======================================================================== 
 Project Export 
-Export Time: 2026/05/08 ���� 17:39:22.88 
+Export Time: 2026/05/08 ���� 18:48:00.30 
 ======================================================================== 
  
 [Directory Structure] 
@@ -8,6 +8,7 @@ Export Time: 2026/05/08 ���� 17:39:22.88
 �ļ��� PATH �б�
 �����к�Ϊ 767D-2718
 C:.
+|   .gitignore
 |   banana_designer_prompts.json
 |   banana_ecommerce_prompts.json
 |   banana_logger.py
@@ -18,14 +19,26 @@ C:.
 |   banner.png
 |   config.ini
 |   logo.png
+|   node.zip
 |   project_export.txt
 |   pyproject.toml
+|   README.md
 |   README_������ComfyUI���������.md
+|   setup_git_and_push.bat
+|   setup_git_and_push.sh
 |   __init__.py
+|   Ŀ¼�ṹ.bat
 |   
 +---.github
 |   \---workflows
 |           publish_action.yml
+|           
++---.ruff_cache
+|   |   .gitignore
+|   |   CACHEDIR.TAG
+|   |   
+|   \---0.15.12
+|           8424871959324145552
 |           
 +---web
 |   |   banana_prompt_editor.html
@@ -46,7 +59,7 @@ C:.
 ======================================================================== 
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_logger.py 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_logger.py 
 ------------------------------------------------------------------------ 
  
 # FILE: banana_logger.py
@@ -97,7 +110,7 @@ __all__ = ["logger"]
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_node.py 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_node.py 
 ------------------------------------------------------------------------ 
  
 # FILE: banana_node.py
@@ -570,7 +583,7 @@ def _request_json_with_failover(
 
     req_headers = dict(headers or {})
     req_headers.setdefault("Accept", "application/json")
-    req_headers.setdefault("User-Agent", "BananaComfyUI/7.12 HRIO_REQUEST_FIX")
+    req_headers.setdefault("User-Agent", "HrioDesignComfyUI/8.1 HRIO_REQUEST_FIX")
     req_headers["Connection"] = "close"
 
     candidates = _candidate_urls(builder, *builder_args, **builder_kwargs)
@@ -898,7 +911,7 @@ def _presign_and_upload_one_image(api_key: str, png_bytes: bytes, index: int, up
         "Content-Type": "application/json",
         "Accept": "application/json",
         "Connection": "close",
-        "User-Agent": "BananaComfyUI/7.12 presign-uploader",
+        "User-Agent": "HrioDesignComfyUI/8.1 presign-uploader",
         "X-API-Key": api_key,
     }
 
@@ -1005,7 +1018,7 @@ def _presign_and_upload_one_image(api_key: str, png_bytes: bytes, index: int, up
 
     put_headers = {
         "Connection": "close",
-        "User-Agent": "BananaComfyUI/7.12 cos-put",
+        "User-Agent": "HrioDesignComfyUI/8.1 cos-put",
     }
 
     if isinstance(required_headers, dict):
@@ -1568,7 +1581,7 @@ def _clear_runtime_results() -> Dict[str, Any]:
     global _LAST_THREE_VIEW_LATEST_KEY
     _LAST_THREE_VIEW_RUNTIME.clear()
     _LAST_THREE_VIEW_LATEST_KEY = ""
-    return {"ok": True, "message": "已清空 Banana 三视图运行期预览缓存"}
+    return {"ok": True, "message": "已清空 Hrio Design 三方案运行期预览缓存"}
 
 def _node_base_values(
     api_key: str,
@@ -3568,10 +3581,10 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HrioBananaNormalThreeViewConcurrentNodeV330": "🎨 Hrio｜普通三方案并发",
-    "HrioBananaNormalSingleImageNode": "🎨 Hrio｜普通单图生成",
-    "HrioBananaNormalVideoSingleOutputNode": "🎨 Hrio｜普通生视频（单输出）",
-    "HrioBananaPromptVideoNode": "🎨 Hrio｜生视频",
+    "HrioBananaNormalThreeViewConcurrentNodeV330": "🎨 Hrio Design｜三方案并发",
+    "HrioBananaNormalSingleImageNode": "🎨 Hrio Design｜单图生成",
+    "HrioBananaNormalVideoSingleOutputNode": "🎨 Hrio Design｜单视频生成",
+    "HrioBananaPromptVideoNode": "🎨 Hrio Design｜视频生成",
 }
 
 __all__ = [
@@ -3615,7 +3628,7 @@ __all__ = [
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_triple_view_node.py 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_triple_view_node.py 
 ------------------------------------------------------------------------ 
  
 # FILE: banana_triple_view_node.py
@@ -3669,24 +3682,24 @@ except Exception as e:
     raise RuntimeError(f"banana_triple_view_node.py 依赖 banana_node.py，请确认 banana_node.py 已正确安装: {e}") from e
 
 
-PLUGIN_VERSION = "8.0.2"
+PLUGIN_VERSION = "8.1.0"
 
-EDITOR_ROUTE = "/banana/designer-template-editor"
-MANIFEST_ROUTE = "/banana/designer-template-manifest"
-CONFIG_ROUTE = "/banana/designer-template-config"
-CONFIG_DEFAULTS_ROUTE = "/banana/designer-template-config/defaults"
-RUNTIME_ROUTE = "/banana/designer-template-runtime"
-RUNTIME_CLEAR_ROUTE = "/banana/designer-template-runtime/clear"
-OLD_EDITOR_ROUTES = ["/banana/triple-view-editor", "/banana/prompt-editor", "/banana/ecommerce-editor", "/ai-ecommerce/editor"]
-OLD_CONFIG_ROUTES = ["/banana/ecommerce-prompt-config", "/ai-design/config"]
-OLD_CONFIG_DEFAULTS_ROUTES = ["/banana/ecommerce-prompt-config/defaults"]
-OLD_RUNTIME_ROUTES = ["/banana/ecommerce-runtime-results", "/ai-design/runtime", "/banana/designer-runtime", "/banana/normal-three-view-runtime"]
-OLD_RUNTIME_CLEAR_ROUTES = ["/banana/ecommerce-runtime-clear", "/ai-design/runtime/clear", "/banana/designer-runtime/clear"]
-AUTOMATION_SELECT_FOLDER_ROUTE = "/banana/automation/select-folder"
-AUTOMATION_PREVIEW_ROUTE = "/banana/automation/preview"
-AUTOMATION_HISTORY_ROUTE = "/banana/automation/history"
-AUTOMATION_HISTORY_CLEAR_ROUTE = "/banana/automation/history-clear"
-AUTOMATION_HISTORY_FILE = "banana_automation_history.json"
+EDITOR_ROUTE = "/hrio-design/editor"
+MANIFEST_ROUTE = "/hrio-design/manifest"
+CONFIG_ROUTE = "/hrio-design/config"
+CONFIG_DEFAULTS_ROUTE = "/hrio-design/config/defaults"
+RUNTIME_ROUTE = "/hrio-design/runtime"
+RUNTIME_CLEAR_ROUTE = "/hrio-design/runtime/clear"
+OLD_EDITOR_ROUTES = []  # 独立新插件不注册旧 /banana 路由，避免和 hrio-commerce 冲突
+OLD_CONFIG_ROUTES = []
+OLD_CONFIG_DEFAULTS_ROUTES = []
+OLD_RUNTIME_ROUTES = []
+OLD_RUNTIME_CLEAR_ROUTES = []
+AUTOMATION_SELECT_FOLDER_ROUTE = "/hrio-design/automation/select-folder"
+AUTOMATION_PREVIEW_ROUTE = "/hrio-design/automation/preview"
+AUTOMATION_HISTORY_ROUTE = "/hrio-design/automation/history"
+AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/automation/history-clear"
+AUTOMATION_HISTORY_FILE = "hrio_design_automation_history.json"
 _AUTOMATION_HISTORY_LOCK = threading.Lock()
 _AUTOMATION_HISTORY_MAX_ITEMS = 500
 
@@ -4420,7 +4433,7 @@ def _select_folder_with_tkinter() -> str:
     root.withdraw()
     root.attributes("-topmost", True)
     try:
-        path = filedialog.askdirectory(title="选择 Banana 自动化文件夹")
+        path = filedialog.askdirectory(title="选择 Hrio Design 自动化文件夹")
     finally:
         root.destroy()
     return str(path or "").strip()
@@ -4684,25 +4697,25 @@ def _register_ecommerce_routes() -> None:
         if not path:
             return
         if _route_exists(method, path):
-            logger.info(f"Banana 路由已存在，跳过重复注册: {method} {path}")
+            logger.info(f"Hrio Design 路由已存在，跳过重复注册: {method} {path}")
             return
         try:
             decorator = getattr(routes, method.lower())
             decorator(path)(handler)
-            logger.success(f"Banana 路由已注册: {method} {path}")
+            logger.success(f"Hrio Design 路由已注册: {method} {path}")
         except Exception as e:
             msg = str(e)
             if "already registered" in msg or "will never be executed" in msg or "Duplicate" in msg:
-                logger.info(f"Banana 路由重复，已跳过: {method} {path}")
+                logger.info(f"Hrio Design 路由重复，已跳过: {method} {path}")
                 return
-            logger.warning(f"Banana 路由注册失败: {method} {path} | {e}")
+            logger.warning(f"Hrio Design 路由注册失败: {method} {path} | {e}")
 
     async def _banana_ecommerce_manifest_get(request):
         payload = {
             "ok": True,
             "plugin_version": PLUGIN_VERSION,
             "editor_route": EDITOR_ROUTE,
-            "editor_alias_routes": OLD_EDITOR_ROUTES,
+            "editor_alias_routes": [],
             "designer_template": _ecommerce_manifest(),
             "ecommerce_three_view": _ecommerce_manifest(),
             "mode_options": _manifest_mode_options(),
@@ -5072,7 +5085,7 @@ class BananaPanelThreeViewNode:
         }
 
         labels = str(labels_prefix or template_display or template_actual).strip()
-        run_cache_key = str(cache_key or "").strip() or f"banana_image_generation:{unique_id}:{template_actual}"
+        run_cache_key = str(cache_key or "").strip() or f"hrio_design_generation:{unique_id}:{template_actual}"
 
         logger.info(
             f"Hrio Design 设计师模板生成开始: mode={template_display}/{template_actual}, model={model}, "
@@ -5185,7 +5198,7 @@ class BananaPanelThreeViewNode:
         template_actual = _mode_actual_from_display(mode, mode_actual)
         template_display = _mode_display_from_actual(template_actual)
         labels = str(labels_prefix or template_display or template_actual).strip()
-        run_cache_key = str(cache_key or "").strip() or f"banana_image_automation:{unique_id}:{template_actual}"
+        run_cache_key = str(cache_key or "").strip() or f"hrio_design_automation:{unique_id}:{template_actual}"
 
         if not cfg.get("input_roots"):
             msg = "自动化已启用，但没有 input_roots。请在自动化面板选择输入根目录。"
@@ -5221,7 +5234,7 @@ class BananaPanelThreeViewNode:
 
         group_concurrency = int(cfg.get("group_concurrency") or 3)
         logger.info(
-            f"Banana 自动化开始: groups={len(groups)}, concurrency={group_concurrency}, "
+            f"Hrio Design 自动化开始: groups={len(groups)}, concurrency={group_concurrency}, "
             f"mode={template_display}/{template_actual}, model={model}, output_root={cfg['output_root']}"
         )
 
@@ -5267,7 +5280,7 @@ class BananaPanelThreeViewNode:
             front = side = back = batch = _error_img(err_text)
 
         lines = [
-            f"✅ Banana 自动化批处理完成，耗时 {elapsed:.1f}s",
+            f"✅ Hrio Design 自动化批处理完成，耗时 {elapsed:.1f}s",
             f"mode: {template_display} ({template_actual})",
             f"model: {model}",
             f"image_size: {image_size}",
@@ -5285,7 +5298,7 @@ class BananaPanelThreeViewNode:
         ]
 
         if cfg.get("save_video"):
-            lines.append("提示: 当前图像自动化节点本身不产生视频；视频已拆分为独立【🍌 Banana｜生视频】节点。")
+            lines.append("提示: 当前图像自动化节点本身不产生视频；视频已拆分为独立【🎨 Hrio Design｜视频生成】节点。")
 
         for r in results:
             if r.get("ok"):
@@ -5294,7 +5307,7 @@ class BananaPanelThreeViewNode:
                 lines.append(f"❌ {r.get('sequence')} -> {r.get('output_dir')} | {r.get('error')}")
 
         summary = "\n".join(lines)
-        logger.summary("Banana 自动化批处理完成", {
+        logger.summary("Hrio Design 自动化批处理完成", {
             "总组数": len(groups),
             "成功": len(ok_results),
             "失败": len(fail_results),
@@ -5313,7 +5326,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "BananaPanelThreeViewNode": "🍌 Hrio｜设计师模板生成",
+    "BananaPanelThreeViewNode": "🎨 Hrio Design｜设计师模板面板",
 }
 
 __all__ = [
@@ -5329,7 +5342,7 @@ __all__ = [
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_update.py 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_update.py 
 ------------------------------------------------------------------------ 
  
 # FILE: banana_update.py
@@ -5361,7 +5374,7 @@ LEGACY_API_BASE_URLS = {
 }
 
 DEFAULT_MANIFEST: Dict[str, Any] = {
-    "plugin_version": "7.13.1",
+    "plugin_version": "8.1.0",
     "schema_version": 1,
     "config_defaults": {
         "base_url": DEFAULT_REMOTE_API_BASE_URL,
@@ -5383,7 +5396,7 @@ DEFAULT_MANIFEST: Dict[str, Any] = {
         "veo_number_of_videos": "1",
     },
     "node": {
-        "display_name": "🎨 Hrio Design API 图像/视频生成",
+        "display_name": "🎨 Hrio Design 独立图像/视频生成",
         "category": "HRIO设计/Image",
         "output_node": True,
         "model_map": {
@@ -5456,7 +5469,7 @@ DEFAULT_MANIFEST: Dict[str, Any] = {
 
 
 def _log(level: str, msg: str) -> None:
-    print(f"[BananaUpdate][{level}] {msg}", flush=True)
+    print(f"[HrioDesignUpdate][{level}] {msg}", flush=True)
 
 
 def _deep_copy(obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -5651,7 +5664,7 @@ def _request_get(url: str, *, timeout: float, verify_ssl: bool, binary: bool = F
     headers = {
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-        "User-Agent": f"BananaComfyPluginUpdater/3.2.2?ts={int(time.time())}",
+        "User-Agent": f"HrioDesignPluginUpdater/8.1.0?ts={int(time.time())}",
     }
 
     cache_buster = f"_banana_ts={int(time.time() * 1000)}"
@@ -5946,7 +5959,7 @@ def load_effective_manifest() -> Dict[str, Any]:
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\__init__.py 
+FILE: C:\Users\34434\Desktop\Hrio-Design\__init__.py 
 ------------------------------------------------------------------------ 
  
 # FILE: __init__.py
@@ -5982,7 +5995,7 @@ CONFIG_DEFAULTS: Dict[str, str] = {
     "api_key": "",
     "base_url": "http://bj-aliyun-1.moki.wang:18000/api/",
     "fallback_base_url": "https://zheshihouduan.tenx-jingli.cloud/api",
-    "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/banana_manifest.json",
+    "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/hrio_design_manifest.json",
     "model": "banano",
     "image_size": "2k",
     "aspect_ratio": "Auto",
@@ -6007,19 +6020,19 @@ CONFIG_DEFAULTS: Dict[str, str] = {
     "always_sync_files": "false",
 }
 
-PLUGIN_VERSION = "8.0.2"
+PLUGIN_VERSION = "8.1.0"
 
 PANEL_NODE_KEY = "Hrio_Design_Template_Node"
-NORMAL_NODE_KEY = "Banana_Normal_Banano_ThreeView_Node"
-NORMAL_SINGLE_IMAGE_NODE_KEY = "Banana_Normal_Single_Image_Node"
-NORMAL_SINGLE_VIDEO_NODE_KEY = "Banana_Normal_Single_Video_Node"
-VIDEO_NODE_KEY = "Banana_Prompt_Video_Node"
+NORMAL_NODE_KEY = "Hrio_Design_Three_View_Node"
+NORMAL_SINGLE_IMAGE_NODE_KEY = "Hrio_Design_Single_Image_Node"
+NORMAL_SINGLE_VIDEO_NODE_KEY = "Hrio_Design_Single_Video_Node"
+VIDEO_NODE_KEY = "Hrio_Design_Video_Node"
 
-PANEL_NODE_DISPLAY = "🎨 Hrio｜设计师模板生成"
-NORMAL_NODE_DISPLAY = "🎨 Hrio｜普通三方案并发"
-NORMAL_SINGLE_IMAGE_NODE_DISPLAY = "🎨 Hrio｜普通单图生成"
-NORMAL_SINGLE_VIDEO_NODE_DISPLAY = "🎨 Hrio｜普通生视频（单输出）"
-VIDEO_NODE_DISPLAY = "🎨 Hrio｜生视频"
+PANEL_NODE_DISPLAY = "🎨 Hrio Design｜设计师模板面板"
+NORMAL_NODE_DISPLAY = "🎨 Hrio Design｜三方案并发"
+NORMAL_SINGLE_IMAGE_NODE_DISPLAY = "🎨 Hrio Design｜单图生成"
+NORMAL_SINGLE_VIDEO_NODE_DISPLAY = "🎨 Hrio Design｜单视频生成"
+VIDEO_NODE_DISPLAY = "🎨 Hrio Design｜视频生成"
 
 PANEL_NODE_CATEGORY = "HRIO设计/模板面板"
 NORMAL_NODE_CATEGORY = "HRIO设计/普通"
@@ -6161,8 +6174,8 @@ logger.info(f"普通节点: {NORMAL_NODE_KEY} => {NORMAL_NODE_DISPLAY} | {NORMAL
 logger.info(f"普通单图节点: {NORMAL_SINGLE_IMAGE_NODE_KEY} => {NORMAL_SINGLE_IMAGE_NODE_DISPLAY} | {NORMAL_NODE_CATEGORY}")
 logger.info(f"普通单输出视频节点: {NORMAL_SINGLE_VIDEO_NODE_KEY} => {NORMAL_SINGLE_VIDEO_NODE_DISPLAY} | {NORMAL_NODE_CATEGORY}")
 logger.info(f"视频节点: {VIDEO_NODE_KEY} => {VIDEO_NODE_DISPLAY} | {VIDEO_NODE_CATEGORY}")
-logger.info("已移除旧节点兼容注册；请删除旧节点并清除浏览器/ComfyUI 缓存")
-logger.info("Hrio Design 面板自动化会应用到当前工作流里所有带 automation_payload 的设计节点")
+logger.info("已使用 Hrio_Design_* 独立节点 Key；可与旧 hrio-commerce / Banana 插件同时安装")
+logger.info("Hrio Design 面板自动化只应用到 Hrio Design 独立节点，避免同步到旧 Banana 节点")
 
 banana_node_mod = None
 
@@ -6203,7 +6216,7 @@ try:
                 NORMAL_NODE_DISPLAY,
                 NORMAL_NODE_CATEGORY,
             )
-            logger.success(f"普通三视图并发节点已注册: {NORMAL_NODE_KEY}")
+            logger.success(f"Hrio Design 三方案并发节点已注册: {NORMAL_NODE_KEY}")
         else:
             normal_maps = getattr(banana_node_mod, "NODE_CLASS_MAPPINGS", {}) or {}
 
@@ -6219,7 +6232,7 @@ try:
                 break
 
             if loaded_normal_alias:
-                logger.success(f"普通 Banana 节点已注册: {NORMAL_NODE_KEY}")
+                logger.success(f"Hrio Design 三方案节点已注册: {NORMAL_NODE_KEY}")
 
         normal_single_image_cls = getattr(banana_node_mod, "HrioBananaNormalSingleImageNode", None)
         if normal_single_image_cls is not None:
@@ -6246,7 +6259,7 @@ try:
             logger.warning("banana_node.py 未找到 HrioBananaNormalVideoSingleOutputNode，跳过普通单输出视频节点注册")
 
 except Exception as e:
-    logger.error(f"普通 Banana 节点注册失败: {e}")
+    logger.error(f"Hrio Design 普通节点注册失败: {e}")
     logger.error(traceback.format_exc())
 
 
@@ -6264,7 +6277,7 @@ try:
         else:
             logger.warning("banana_node.py 未找到 HrioBananaPromptVideoNode，跳过生视频节点注册")
 except Exception as e:
-    logger.error(f"Banana 生视频节点注册失败: {e}")
+    logger.error(f"Hrio Design 生视频节点注册失败: {e}")
     logger.error(traceback.format_exc())
 
 
@@ -6292,7 +6305,7 @@ try:
     logger.success(f"Hrio Design 设计师模板节点已注册: {PANEL_NODE_KEY}")
 
 except Exception as e:
-    logger.error(f"Banana 图像生成节点加载失败: {e}")
+    logger.error(f"Hrio Design 模板面板节点加载失败: {e}")
     logger.error(traceback.format_exc())
 
 
@@ -6307,13 +6320,13 @@ __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_designer_prompts.json 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_designer_prompts.json 
 ------------------------------------------------------------------------ 
  
 {
-  "plugin_version": "8.0.2",
+  "plugin_version": "8.1.0",
   "version": 2,
-  "description": "Hrio Design 设计师模板生成节点提示词配置。面向平面设计师与室内设计师。冬之韵淡灰 / 暖砂淡黄只作为前端 UI 主题皮肤，不默认参与生成提示词。",
+  "description": "Hrio Design 独立设计师模板提示词配置 v8.1.0。平面设计与室内设计模板完整内置。",
   "updated_at": "2026-04-27T00:00:00.000Z",
   "designer_type_options": {
     "平面设计": "graphic_design",
@@ -6493,13 +6506,13 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_designer_
 } 
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_ecommerce_prompts.json 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_ecommerce_prompts.json 
 ------------------------------------------------------------------------ 
  
 {
-  "plugin_version": "8.0.2",
+  "plugin_version": "8.1.0",
   "version": 2,
-  "description": "Hrio Design 设计师模板生成节点提示词配置。面向平面设计师与室内设计师。冬之韵淡灰 / 暖砂淡黄只作为前端 UI 主题皮肤，不默认参与生成提示词。",
+  "description": "Hrio Design 独立设计师模板提示词配置 v8.1.0。平面设计与室内设计模板完整内置。",
   "updated_at": "2026-04-27T00:00:00.000Z",
   "designer_type_options": {
     "平面设计": "graphic_design",
@@ -6679,15 +6692,15 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_ecommerce
 } 
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_manifest.json 
+FILE: C:\Users\34434\Desktop\Hrio-Design\banana_manifest.json 
 ------------------------------------------------------------------------ 
  
 {
-  "plugin_version": "8.0.2",
+  "plugin_version": "8.1.0",
   "schema_version": 1,
   "name": "Hrio-Design",
-  "display_name": "Hrio Design 设计师模板生成",
-  "description": "平面设计 / 室内设计 ComfyUI 设计师模板面板 v8.0.2：修复普通单图、普通三方案、生视频节点仍显示旧电商默认提示词的问题，并让面板同步设计师模板提示词到所有 Hrio Design 相关节点。",
+  "display_name": "Hrio Design 独立设计师节点",
+  "description": "Hrio Design 独立 ComfyUI 插件 v8.1.0：节点 Key 全部改为 Hrio_Design_*，避免与旧 hrio-commerce/Banana 插件冲突；新增 GitHub 自动发布 workflow 和一键推送脚本。",
   "config_defaults": {
     "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/hrio_design_manifest.json",
     "base_url": "https://zheshihouduan.tenx-jingli.cloud/api/",
@@ -6711,7 +6724,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_manifest.
     "veo_number_of_videos": "1"
   },
   "node": {
-    "display_name": "🎨 Hrio｜设计师模板生成",
+    "display_name": "🎨 Hrio Design｜设计师模板面板",
     "category": "HRIO设计/模板面板",
     "output_node": true,
     "optional_image_slots": 10,
@@ -6720,13 +6733,44 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_manifest.
       "banano-pro": "banano-pro",
       "gemini3.1-pro": "gemini3.1-pro"
     },
-    "enum_sources": {}
+    "enum_sources": {
+      "model_map": {
+        "banano2": "banano",
+        "banano-pro": "banano-pro",
+        "gemini3.1-pro": "gemini3.1-pro"
+      },
+      "image_size_options": {
+        "1K": "1K",
+        "2K": "2K",
+        "4K": "4K",
+        "8K（默认16:9）": "8K"
+      },
+      "aspect_ratio_options": {
+        "Auto": "Auto",
+        "1:1 (方形)": "1:1",
+        "3:4 (竖屏标准)": "3:4",
+        "4:3 (横屏标准)": "4:3",
+        "9:16 (竖屏/手机)": "9:16",
+        "16:9 (横屏宽幅)": "16:9"
+      },
+      "video_model_map": {
+        "veo3.1": "veo3.1"
+      },
+      "video_resolution_options": {
+        "1080p": "1080p",
+        "720p": "720p"
+      },
+      "video_aspect_ratio_options": {
+        "16:9 (横屏宽幅)": "16:9",
+        "9:16 (竖屏/手机)": "9:16"
+      }
+    }
   },
   "ecommerce_three_view": {
-    "display_name": "🎨 Hrio｜设计师模板生成",
+    "display_name": "🎨 Hrio Design｜设计师模板面板",
     "category": "HRIO设计/模板面板",
     "prompt_store_path": "banana_designer_prompts.json",
-    "editor_route": "/banana/designer-template-editor",
+    "editor_route": "/hrio-design/editor",
     "editor_html": "web/banana_prompt_editor.html",
     "mode_options": {
       "平面｜品牌主视觉 KV": "brand_key_visual",
@@ -6748,56 +6792,18 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\banana_manifest.
     "default_image_size": "4K",
     "default_aspect_ratio": "16:9 (横屏宽幅)"
   },
-  "video": {}
+  "video": {},
+  "independent_node_keys": {
+    "template": "Hrio_Design_Template_Node",
+    "three_view": "Hrio_Design_Three_View_Node",
+    "single_image": "Hrio_Design_Single_Image_Node",
+    "single_video": "Hrio_Design_Single_Video_Node",
+    "video": "Hrio_Design_Video_Node"
+  }
 } 
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\pyproject.toml 
------------------------------------------------------------------------- 
- 
-[project]
-name = "hrio-design"
-version = "8.0.2"
-description = "Hrio Design graphic and interior design template nodes for ComfyUI, with design prompt editor, normal single-output image node, normal single-output video node, and three-variant generation."
-license = { text = "Proprietary" }
-requires-python = ">=3.10"
-dependencies = [
-    "requests",
-    "numpy",
-    "pillow"
-]
-classifiers = [
-    "Operating System :: OS Independent"
-]
-
-[project.urls]
-Repository = "https://github.com/moki-flank/Hrio-Design"
-Documentation = "https://github.com/moki-flank/Hrio-Design"
-"Bug Tracker" = "https://github.com/moki-flank/Hrio-Design/issues"
-
-[tool.comfy]
-PublisherId = "moki"
-DisplayName = "Hrio-Design"
-Icon = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/logo.png"
-Banner = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/banner.png"
-includes = [
-    "__init__.py",
-    "banana_logger.py",
-    "banana_update.py",
-    "banana_node.py",
-    "banana_triple_view_node.py",
-    "banana_manifest.json",
-    "banana_designer_prompts.json",
-    "banana_ecommerce_prompts.json",
-    "config.ini",
-    "web/**/*",
-    "logo.png",
-    "banner.png"
-]
- 
- 
------------------------------------------------------------------------- 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\config.ini 
+FILE: C:\Users\34434\Desktop\Hrio-Design\config.ini 
 ------------------------------------------------------------------------ 
  
 [banana]
@@ -6831,7 +6837,7 @@ check_interval_sec = 300
  
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\banana_prompt_editor.html 
+FILE: C:\Users\34434\Desktop\Hrio-Design\web\banana_prompt_editor.html 
 ------------------------------------------------------------------------ 
  
 <!-- FILE: web/banana_prompt_editor.html -->
@@ -8281,12 +8287,12 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\banana_promp
     (() => {
       "use strict";
 
-      const DEFAULT_PLUGIN_VERSION = "8.0.2";
-      const STORAGE_KEY = "hrio.designPromptEditor.cache.v801";
-      const UI_STATE_KEY = "hrio.designPromptEditor.ui.v801";
-      const COMMAND_CHANNEL = "banana_designer_template_bridge";
-      const COMMAND_STORAGE_KEY = "banana_designer_template_command";
-      const LIVE_CONFIG_KEY = "banana_designer_template_live_config";
+      const DEFAULT_PLUGIN_VERSION = "8.1.0";
+      const STORAGE_KEY = "hrio.designPromptEditor.cache.v810";
+      const UI_STATE_KEY = "hrio.designPromptEditor.ui.v810";
+      const COMMAND_CHANNEL = "hrio_design_template_bridge";
+      const COMMAND_STORAGE_KEY = "hrio_design_template_command";
+      const LIVE_CONFIG_KEY = "hrio_design_template_live_config";
       const ASSET_BASE = "https://img.hrio.site/assets/plu/";
 
       const API_BASE_CANDIDATES = [
@@ -8296,60 +8302,33 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\banana_promp
       ];
 
       const SIMPLE_UPLOAD_ROUTES = [
-        "/ai-design/upload-preview",
-        "/banana/designer-upload-preview",
-        "/banana/upload-preview",
-        "/upload/image",
+        "/hrio-design/upload-preview",
         "/uploads/image",
-        "/api/upload/image",
         "/api/uploads/image"
       ];
 
       const PRESIGN_ROUTES = [
-        "/ai-design/uploads/presign",
-        "/banana/uploads/presign",
+        "/hrio-design/uploads/presign",
         "/uploads/presign",
         "/api/uploads/presign"
       ];
 
       const CONFIG_GET_ROUTES = [
-        "/banana/designer-template-config",
-        "/banana/ecommerce-prompt-config",
-        "/ai-design/config",
-        "/banana/designer-template-config",
+        "/hrio-design/config",
         "./banana_designer_prompts.json",
-        "././banana_designer_prompts.json",
-        "/index/plugins/banana_designer_prompts.json",
-        "/index/plugins2/banana_designer_prompts.json",
-        "/plugins/banana_designer_prompts.json",
-        "/plugins2/banana_designer_prompts.json"
+        "././banana_designer_prompts.json"
       ];
 
       const CONFIG_POST_ROUTES = [
-        "/banana/designer-template-config",
-        "/banana/ecommerce-prompt-config",
-        "/ai-design/config",
-        "/ai-design/save",
-        "/banana/designer-template-config",
-        "/banana/designer-template-save",
-        "/banana/save-designer-template-config"
+        "/hrio-design/config"
       ];
 
       const RUNTIME_GET_ROUTES = [
-        "/banana/designer-template-runtime",
-        "/banana/ecommerce-runtime-results",
-        "/ai-design/runtime",
-        "/banana/designer-template-runtime",
-        "/banana/designer-runtime",
-        "/banana/normal-three-view-runtime"
+        "/hrio-design/runtime"
       ];
 
       const RUNTIME_CLEAR_ROUTES = [
-        "/banana/designer-template-runtime/clear",
-        "/banana/ecommerce-runtime-clear",
-        "/ai-design/runtime/clear",
-        "/banana/designer-template-runtime/clear",
-        "/banana/designer-runtime/clear"
+        "/hrio-design/runtime/clear"
       ];
 
       const DESIGNER_TYPE_OPTIONS = {
@@ -10001,58 +9980,53 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\banana_promp
 </html> 
  
 ------------------------------------------------------------------------ 
-FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_triple_view_ui.js 
+FILE: C:\Users\34434\Desktop\Hrio-Design\web\js\banana_triple_view_ui.js 
 ------------------------------------------------------------------------ 
  
 // FILE: web/js/banana_triple_view_ui.js
 (() => {
   "use strict";
 
-  const EDITOR_ROUTE = "/banana/designer-template-editor";
-  const AUTOMATION_SELECT_FOLDER_ROUTE = "/banana/automation/select-folder";
-  const AUTOMATION_PREVIEW_ROUTE = "/banana/automation/preview";
-  const AUTOMATION_HISTORY_ROUTE = "/banana/automation/history";
-  const AUTOMATION_HISTORY_CLEAR_ROUTE = "/banana/automation/history-clear";
-  const CONFIG_ROUTE = "/banana/designer-template-config";
-  const OLD_EDITOR_ROUTES = [
-    "/banana/triple-view-editor",
-    "/banana/prompt-editor",
-    "/banana/ecommerce-editor",
-    "/ai-ecommerce/editor",
-  ];
+  const EDITOR_ROUTE = "/hrio-design/editor";
+  const AUTOMATION_SELECT_FOLDER_ROUTE = "/hrio-design/automation/select-folder";
+  const AUTOMATION_PREVIEW_ROUTE = "/hrio-design/automation/preview";
+  const AUTOMATION_HISTORY_ROUTE = "/hrio-design/automation/history";
+  const AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/automation/history-clear";
+  const CONFIG_ROUTE = "/hrio-design/config";
+  const OLD_EDITOR_ROUTES = [];
   const EDITOR_ROUTE_CANDIDATES = [EDITOR_ROUTE, ...OLD_EDITOR_ROUTES];
 
   const PANEL_ID = "hrio-design-image-launcher";
   const STYLE_ID = "hrio-design-image-style";
   const MODAL_ID = "hrio-design-automation-modal";
   const EDITOR_MODAL_ID = "hrio-design-editor-modal";
-  const EXTENSION_NAME = "hrio.design.bridge.v8_0_2";
+  const EXTENSION_NAME = "hrio.design.bridge.v8_1_0";
 
-  const COMMAND_CHANNEL = "banana_three_view_bridge";
-  const DESIGNER_COMMAND_CHANNEL = "banana_designer_template_bridge";
-  const COMMAND_STORAGE_KEY = "banana_three_view_command";
-  const DESIGNER_COMMAND_STORAGE_KEY = "banana_designer_template_command";
-  const LIVE_CONFIG_KEY = "banana_three_view_live_config";
-  const DESIGNER_LIVE_CONFIG_KEY = "banana_designer_template_live_config";
-  const AUTOMATION_STORAGE_KEY = "banana_three_view_automation_payload_v713";
+  const COMMAND_CHANNEL = "hrio_design_three_view_bridge";
+  const DESIGNER_COMMAND_CHANNEL = "hrio_design_template_bridge";
+  const COMMAND_STORAGE_KEY = "hrio_design_three_view_command";
+  const DESIGNER_COMMAND_STORAGE_KEY = "hrio_design_template_command";
+  const LIVE_CONFIG_KEY = "hrio_design_three_view_live_config";
+  const DESIGNER_LIVE_CONFIG_KEY = "hrio_design_template_live_config";
+  const AUTOMATION_STORAGE_KEY = "hrio_design_automation_payload_v810";
   const OLD_AUTOMATION_STORAGE_KEYS = [
     "banana_three_view_automation_payload",
     "banana_three_view_automation_payload_v710",
     "banana_three_view_automation_payload_v712",
     "banana_three_view_automation_payload_v713",
   ];
-  const AUTOMATION_CLEAR_FLAG_KEY = "banana_three_view_automation_clear_flag_v713";
-  const FLOAT_POSITION_STORAGE_KEY = "banana_winter_rhyme_float_position";
+  const AUTOMATION_CLEAR_FLAG_KEY = "hrio_design_automation_clear_flag_v810";
+  const FLOAT_POSITION_STORAGE_KEY = "hrio_design_float_position";
 
   const PANEL_NODE_KEY = "Hrio_Design_Template_Node";
-  const PANEL_NODE_ALIAS_KEY = "Banana_Image_Generation_Template_Node";
-  const NORMAL_NODE_KEY = "Banana_Normal_Banano_ThreeView_Node";
-  const NORMAL_SINGLE_IMAGE_NODE_KEY = "Banana_Normal_Single_Image_Node";
+  const PANEL_NODE_ALIAS_KEY = "Hrio_Design_Template_Node";
+  const NORMAL_NODE_KEY = "Hrio_Design_Three_View_Node";
+  const NORMAL_SINGLE_IMAGE_NODE_KEY = "Hrio_Design_Single_Image_Node";
   const NORMAL_SINGLE_IMAGE_CLASS = "HrioBananaNormalSingleImageNode";
-  const NORMAL_SINGLE_VIDEO_NODE_KEY = "Banana_Normal_Single_Video_Node";
+  const NORMAL_SINGLE_VIDEO_NODE_KEY = "Hrio_Design_Single_Video_Node";
   const NORMAL_SINGLE_VIDEO_CLASS = "HrioBananaNormalVideoSingleOutputNode";
-  const VIDEO_NODE_KEY = "HrioBananaPromptVideoNode";
-  const VIDEO_NODE_ALIAS_KEY = "Banana_Prompt_Video_Node";
+  const VIDEO_NODE_KEY = "Hrio_Design_Video_Node";
+  const VIDEO_NODE_ALIAS_KEY = "Hrio_Design_Video_Node";
 
   const VIEW_SCOPE_MAP = {
     front: "仅重新生成正面",
@@ -10867,7 +10841,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
       '    <div><strong>🎨 Hrio Design｜设计师模板面板</strong><span>嵌入当前 ComfyUI 页面；编辑内容会实时自动同步到节点。</span></div>' +
       '    <div class="editor-actions"><button class="editor-btn" data-editor-refresh type="button">刷新面板</button><button class="editor-close" data-editor-close type="button">×</button></div>' +
       '  </div>' +
-      '  <iframe data-editor-frame title="Banana Hrio Design模板面板"></iframe>' +
+      '  <iframe data-editor-frame title="Hrio Design模板面板"></iframe>' +
       '</div>';
 
     const close = () => modal.classList.remove("show");
@@ -11097,8 +11071,8 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
       text.includes(VIDEO_NODE_ALIAS_KEY) ||
       text.includes("🎨 Hrio｜生视频") ||
       text.includes("Hrio｜生视频") ||
-      text.includes("🍌 Banana｜生视频") ||
-      text.includes("Banana｜生视频") ||
+      text.includes("🎨 Hrio Design｜视频生成") ||
+      text.includes("Hrio Design｜视频生成") ||
       (hasVideoModel && hasWidget(node, ["automation_payload", "自动化映射"]))
     ) {
       return "video";
@@ -11119,7 +11093,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
       text.includes("🎨 Hrio｜普通三方案并发") ||
       text.includes("普通三方案") ||
       text.includes("🍌 普通三视图并发节点") ||
-      text.includes("🍌 Banana｜普通三视图并发") ||
+      text.includes("🎨 Hrio Design｜三方案并发") ||
       text.includes("普通三视图") ||
       text.includes("Normal_Banano") ||
       hasWidget(node, ["front_prompt", "正面图提示词", "方案A提示词"])
@@ -11133,8 +11107,8 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
       text.includes("BananaPanelThreeViewNode") ||
       text.includes("🎨 Hrio｜设计师模板生成") ||
       text.includes("Hrio｜设计师模板生成") ||
-      text.includes("🍌 Banana｜图像生成") ||
-      text.includes("Banana｜图像生成")
+      text.includes("🎨 Hrio Design｜设计师模板面板") ||
+      text.includes("Hrio Design｜设计师模板面板")
     ) {
       return "panel";
     }
@@ -11286,7 +11260,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
           node.title = "🎨 Hrio｜普通三方案并发";
         } else if (kind === "panel") {
           node.title = "🎨 Hrio｜设计师模板生成";
-        } else if (!node.title || String(node.title).includes("Banana")) {
+        } else if (!node.title || String(node.title).includes("Hrio")) {
           node.title = node.title || "🎨 Hrio｜设计自动化节点";
         }
 
@@ -11881,7 +11855,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
               <h3>输出根目录</h3>
               <div class="auto-muted">每个序号组会输出到 output_序号/run_01/，例如 output_001/run_01/front.png。</div>
               <div style="margin-top:10px;">
-                <input data-auto-output-root placeholder="D:/输出/banana_runs" />
+                <input data-auto-output-root placeholder="D:/输出/hrio_design_runs" />
               </div>
               <div class="auto-actions">
                 <button class="auto-btn" data-auto-pick-output-root type="button">选择输出根目录</button>
@@ -11910,7 +11884,7 @@ FILE: C:\Users\34434\Documents\ComfyUI\custom_nodes\Hrio-Design\web\js\banana_tr
 
             <div class="auto-box">
               <h3>操作</h3>
-              <div class="auto-muted">先预览分组，确认序号聚合正确后，再应用到当前工作流里的 Banana 图像节点与生视频节点。普通图像节点会保存图片，生视频节点会读取最多 10 张参考图并保存 result.mp4。</div>
+              <div class="auto-muted">先预览分组，确认序号聚合正确后，再应用到当前工作流里的 Hrio Design 图像节点与生视频节点。普通图像节点会保存图片，生视频节点会读取最多 10 张参考图并保存 result.mp4。</div>
               <div class="auto-actions">
                 <button class="auto-btn" data-auto-preview type="button">预览分组</button>
                 <button class="auto-btn secondary" data-auto-copy type="button">复制 JSON</button>

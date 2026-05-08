@@ -1,6 +1,6 @@
 [project]
 name = "hrio-design"
-version = "1.0.1"
+version = "8.1.5"
 description = "Independent Hrio Design custom nodes for ComfyUI. Graphic design and interior design prompt editor, single image node, single video node, and three-variant design generation."
 license = { text = "Proprietary" }
 requires-python = ">=3.10"
@@ -19,7 +19,7 @@ Documentation = "https://github.com/moki-flank/Hrio-Design"
 "Bug Tracker" = "https://github.com/moki-flank/Hrio-Design/issues"
 
 [tool.comfy]
-PublisherId = "mokiya"
+PublisherId = "moki"
 DisplayName = "Hrio-Design"
 Icon = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/logo.png"
 Banner = "https://raw.githubusercontent.com/moki-flank/Hrio-Design/main/banner.png"
