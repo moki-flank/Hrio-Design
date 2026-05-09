@@ -20,7 +20,7 @@ echo ======================================================================== >>
 echo [File Contents] >> "%OUTPUT_FILE%"
 echo ======================================================================== >> "%OUTPUT_FILE%"
 
-for /r %%f in (*.py *.json *.html *.yaml *.dart *.js *.ini *.cfg) do (
+for /r %%f in (*.py *.json *.md *.yaml *.dart *.html *.ini *.js) do (
     echo. >> "%OUTPUT_FILE%"
     echo ------------------------------------------------------------------------ >> "%OUTPUT_FILE%"
     echo FILE: %%f >> "%OUTPUT_FILE%"

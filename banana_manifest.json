@@ -1,9 +1,9 @@
 {
-  "plugin_version": "8.1.4",
+  "plugin_version": "8.1.8",
   "schema_version": 1,
   "name": "Hrio-Design",
   "display_name": "Hrio Design 独立设计师节点",
-  "description": "Hrio Design 独立插件 v8.1.4：普通单图、普通三方案、普通视频、视频生成节点全部保持手动提示词，不再被模板面板强制覆盖；自动化 payload 仍应用到所有带 automation_payload 的节点。",
+  "description": "Hrio Design 独立插件 v8.1.8：自动化分组预览支持递归扫描输入项目根目录与缩略图预览；普通单图、三方案、视频节点保持手动提示词，自动化 payload 后台静默应用。",
   "config_defaults": {
     "manifest_url": "https://wen.tenx-jingli.cloud/plugins2/hrio_design_manifest.json",
     "base_url": "https://zheshihouduan.tenx-jingli.cloud/api/",
@@ -103,5 +103,5 @@
     "single_video": "Hrio_Design_Single_Video_Node",
     "video": "Hrio_Design_Video_Node"
   },
-  "version": 813
+  "version": 818
 }

@@ -8,6 +8,7 @@
   const AUTOMATION_HISTORY_ROUTE = "/hrio-design/automation/history";
   const AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/automation/history-clear";
   const CONFIG_ROUTE = "/hrio-design/config";
+  const RUNTIME_ROUTE = "/hrio-design/runtime";
   const OLD_EDITOR_ROUTES = [
     "/banana/designer-template-editor",
     "/banana/triple-view-editor",
@@ -22,7 +23,8 @@
   const STYLE_ID = "hrio-design-image-style";
   const MODAL_ID = "hrio-design-automation-modal";
   const EDITOR_MODAL_ID = "hrio-design-editor-modal";
-  const EXTENSION_NAME = "hrio.design.bridge.v8_1_5";
+  const VIDEO_MODAL_ID = "hrio-design-video-modal";
+  const EXTENSION_NAME = "hrio.design.bridge.v8_1_8";
 
   const COMMAND_CHANNEL = "hrio_design_three_view_bridge";
   const DESIGNER_COMMAND_CHANNEL = "hrio_design_template_bridge";
@@ -49,6 +51,7 @@
   const NORMAL_SINGLE_VIDEO_CLASS = "HrioBananaNormalVideoSingleOutputNode";
   const VIDEO_NODE_KEY = "Hrio_Design_Video_Node";
   const VIDEO_NODE_ALIAS_KEY = "Hrio_Design_Video_Node";
+  const AUTOMATION_TOGGLE_WIDGET_MARK = "__hrio_automation_toggle_widget__";
 
   const VIEW_SCOPE_MAP = {
     front: "仅重新生成正面",
@@ -94,6 +97,12 @@
     queueTimer: null,
     pollTimer: null,
     beautifyTimer: null,
+    launcher: {
+      lastText: "就绪",
+      lastKind: "ok",
+      lastUpdatedAt: 0,
+      lastActionKey: "init",
+    },
     automation: {
       inputRoots: [],
       outputRoot: "",
@@ -117,6 +126,7 @@
       moved: false,
     },
   };
+  let automationPreviewTimer = null;
 
   function isEditorPage() {
     const path = String(location.pathname || "");
@@ -283,6 +293,26 @@
         box-shadow: 0 0 0 5px rgba(236,95,117,.16);
       }
 
+      #${PANEL_ID}.warn .wr-dot {
+        background: #f59e0b;
+        box-shadow: 0 0 0 5px rgba(245,158,11,.16);
+      }
+
+      /* HRIO_NO_STATUS_BAR: 彻底隐藏右下角浮窗状态栏，避免一闪一闪。 */
+      #${PANEL_ID} .wr-state {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+      }
+
       #${PANEL_ID} .wr-grid {
         position: relative;
         display: grid;
@@ -434,6 +464,128 @@
         height: 100%;
         border: 0;
         background: #f4f9ff;
+      }
+
+      #${VIDEO_MODAL_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 1000002;
+        display: none;
+        place-items: center;
+        background: rgba(10, 22, 36, .46);
+        backdrop-filter: blur(8px);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      #${VIDEO_MODAL_ID}.show {
+        display: grid;
+      }
+
+      #${VIDEO_MODAL_ID} .video-card {
+        width: min(980px, calc(100vw - 36px));
+        max-height: calc(100vh - 42px);
+        overflow: hidden;
+        border-radius: 24px;
+        border: 1px solid rgba(255,255,255,.92);
+        background: linear-gradient(135deg, rgba(239,248,255,.98), rgba(255,248,252,.96));
+        box-shadow: 0 28px 82px rgba(31,73,118,.34);
+        color: #24496f;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #${VIDEO_MODAL_ID} .video-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 16px 12px 18px;
+        border-bottom: 1px solid rgba(113,159,210,.18);
+      }
+
+      #${VIDEO_MODAL_ID} .video-head strong {
+        display: block;
+        font-size: 16px;
+        font-weight: 950;
+      }
+
+      #${VIDEO_MODAL_ID} .video-head span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        color: rgba(49,93,143,.66);
+      }
+
+      #${VIDEO_MODAL_ID} .video-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      #${VIDEO_MODAL_ID} .video-btn,
+      #${VIDEO_MODAL_ID} .video-close {
+        height: 32px;
+        border-radius: 13px;
+        border: 1px solid rgba(113,159,210,.20);
+        background: rgba(255,255,255,.76);
+        color: #315d8f;
+        cursor: pointer;
+        padding: 0 11px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      #${VIDEO_MODAL_ID} .video-close {
+        width: 32px;
+        padding: 0;
+        font-size: 18px;
+      }
+
+      #${VIDEO_MODAL_ID} .video-body {
+        padding: 16px;
+        overflow: auto;
+        display: grid;
+        gap: 12px;
+      }
+
+      #${VIDEO_MODAL_ID} .video-empty {
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.68);
+        border: 1px dashed rgba(113,159,210,.24);
+        color: rgba(49,93,143,.72);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      #${VIDEO_MODAL_ID} .video-item {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.70);
+        border: 1px solid rgba(113,159,210,.18);
+      }
+
+      #${VIDEO_MODAL_ID} .video-item-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        font-size: 12px;
+        color: rgba(49,93,143,.72);
+      }
+
+      #${VIDEO_MODAL_ID} .video-item-head strong {
+        color: #24496f;
+        font-size: 13px;
+      }
+
+      #${VIDEO_MODAL_ID} video {
+        width: 100%;
+        max-height: min(62vh, 560px);
+        border-radius: 14px;
+        background: #0b1220;
       }
 
       #${MODAL_ID} {
@@ -684,7 +836,9 @@
       }
 
       #${MODAL_ID} .auto-table th:nth-child(1),
-      #${MODAL_ID} .auto-table td:nth-child(1) { width: 86px; }
+      #${MODAL_ID} .auto-table td:nth-child(1) { width: 72px; }
+      #${MODAL_ID} .auto-table th:nth-child(3),
+      #${MODAL_ID} .auto-table td:nth-child(3) { width: 240px; }
       #${MODAL_ID} .auto-table th:nth-child(4),
       #${MODAL_ID} .auto-table td:nth-child(4) { width: 90px; }
 
@@ -702,8 +856,137 @@
       #${MODAL_ID} .auto-preview-scroll {
         overflow: auto;
         margin-top: 10px;
-        max-height: 280px;
+        max-height: 360px;
         border-radius: 14px;
+      }
+
+      #${MODAL_ID} .auto-thumb-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: flex-start;
+        min-width: 0;
+      }
+
+      #${MODAL_ID} .auto-thumb-card {
+        width: 74px;
+        min-width: 74px;
+        border: 1px solid rgba(96, 135, 190, 0.18);
+        border-radius: 12px;
+        padding: 5px;
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: 0 8px 20px rgba(30, 64, 110, 0.06);
+      }
+
+      #${MODAL_ID} .auto-thumb-card img,
+      #${MODAL_ID} .auto-thumb-empty {
+        width: 62px;
+        height: 62px;
+        border-radius: 10px;
+        object-fit: cover;
+        display: block;
+        background: linear-gradient(135deg, #eef5ff, #f8fbff);
+        border: 1px solid rgba(96, 135, 190, 0.18);
+      }
+
+      #${MODAL_ID} .auto-thumb-card img {
+        cursor: zoom-in;
+      }
+
+      #${MODAL_ID} .auto-thumb-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8ca1bd;
+        font-size: 11px;
+      }
+
+      #${MODAL_ID} .auto-thumb-meta {
+        margin-top: 4px;
+        line-height: 1.25;
+        font-size: 11px;
+        color: #496583;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      #${MODAL_ID} .auto-thumb-sub {
+        color: #8aa0ba;
+        font-size: 10px;
+      }
+
+      #${MODAL_ID} .auto-scan-report {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      #${MODAL_ID} .auto-scan-report-row {
+        display: grid;
+        grid-template-columns: 46px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        padding: 7px 8px;
+        border-radius: 12px;
+        background: rgba(246, 250, 255, .78);
+        border: 1px solid rgba(113,159,210,.16);
+      }
+
+      #${MODAL_ID} .auto-scan-report-row code {
+        color: #315d8f;
+        font-weight: 900;
+      }
+
+      #${MODAL_ID} .auto-scan-report-path {
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: #466381;
+      }
+
+      #${MODAL_ID} .auto-scan-report-stat {
+        color: #7990ad;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .hrio-auto-image-lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 28px;
+        background: rgba(6, 15, 28, 0.72);
+        backdrop-filter: blur(10px);
+      }
+
+      .hrio-auto-image-lightbox-inner {
+        max-width: min(92vw, 1100px);
+        max-height: 92vh;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+        padding: 12px;
+      }
+
+      .hrio-auto-image-lightbox-inner img {
+        max-width: calc(92vw - 24px);
+        max-height: calc(88vh - 54px);
+        display: block;
+        border-radius: 12px;
+      }
+
+      .hrio-auto-image-lightbox-caption {
+        margin-top: 8px;
+        max-width: calc(92vw - 24px);
+        color: #334b68;
+        font-size: 12px;
+        line-height: 1.45;
+        word-break: break-all;
       }
 
       @media (max-width: 720px) {
@@ -881,21 +1164,7 @@
   }
 
   async function resolveEditorUrl() {
-    const errors = [];
-    for (const route of EDITOR_ROUTE_CANDIDATES) {
-      const url = new URL(route + "?embedded=1&t=" + Date.now(), window.location.origin).href;
-      try {
-        const res = await fetch(url, { method: "GET", cache: "no-store" });
-        const contentType = String(res.headers.get("content-type") || "");
-        if (res.ok && (contentType.includes("text/html") || contentType.includes("text/plain") || !contentType)) {
-          return url;
-        }
-        errors.push(route + " -> HTTP " + res.status);
-      } catch (error) {
-        errors.push(route + " -> " + (error && error.message ? error.message : String(error)));
-      }
-    }
-    console.warn("[Hrio Design] editor route detection failed, fallback to main route:", errors);
+    // 直接打开主面板路由，避免节点执行/失败后预探测请求阻塞，导致看起来“面板打不开”。
     return new URL(EDITOR_ROUTE + "?embedded=1&t=" + Date.now(), window.location.origin).href;
   }
 
@@ -930,7 +1199,10 @@
     injectStyle();
 
     let panel = document.getElementById(PANEL_ID);
-    if (panel) return;
+    if (panel) {
+      hideLauncherStateBar();
+      return;
+    }
 
     panel = document.createElement("div");
     panel.id = PANEL_ID;
@@ -943,15 +1215,10 @@
           <span>平面设计 · 室内设计 · 提示词手动 · 自动化全节点</span>
         </div>
       </div>
-
-      <div class="wr-state" title="节点同步状态">
-        <span class="wr-dot"></span>
-        <span data-state-text>提示词只同步模板节点，自动化全节点</span>
-      </div>
-
       <div class="wr-grid compact">
         <button class="wr-btn full" data-open-editor type="button">打开Hrio Design模板面板</button>
         <button class="wr-btn secondary" data-automation type="button">自动化</button>
+        <button class="wr-btn secondary" data-video-view type="button">查看视频</button>
         <button class="wr-btn secondary" data-clear-automation type="button">清除自动化</button>
         <button class="wr-btn secondary" data-history type="button">历史记录</button>
       </div>
@@ -962,12 +1229,15 @@
     `;
 
     panel.querySelector("[data-open-editor]").onclick = () => {
-      if (state.drag.moved) return;
       openTemplateEditor();
     };
 
     panel.querySelector("[data-automation]").onclick = () => {
       openAutomationModal();
+    };
+
+    panel.querySelector("[data-video-view]").onclick = () => {
+      openVideoModal();
     };
 
     panel.querySelector("[data-clear-automation]").onclick = () => {
@@ -980,20 +1250,29 @@
     };
 
     document.body.appendChild(panel);
+    hideLauncherStateBar();
     applySavedFloatPosition(panel);
     makeLauncherDraggable(panel);
   }
 
-  function setLauncherState(text, kind = "ok") {
+  function hideLauncherStateBar() {
     const panel = document.getElementById(PANEL_ID);
     if (!panel) return;
+    try {
+      panel.querySelectorAll(".wr-state").forEach((el) => el.remove());
+    } catch {}
+  }
 
-    panel.classList.toggle("ok", kind === "ok" || kind === "normal");
-    panel.classList.toggle("syncing", kind === "syncing");
-    panel.classList.toggle("error", kind === "error");
-
-    const el = panel.querySelector("[data-state-text]");
-    if (el) el.textContent = text;
+  function setLauncherState(text, kind = "ok", options = {}) {
+    // 状态栏已取消显示：只记录内部状态，不再写入浮窗 DOM。
+    // 这样保留所有调用兼容性，同时彻底避免状态条闪烁。
+    const message = String(text || "就绪");
+    const normalizedKind = kind === "normal" ? "ok" : (kind || "ok");
+    state.launcher.lastText = message;
+    state.launcher.lastKind = normalizedKind;
+    state.launcher.lastUpdatedAt = Date.now();
+    state.launcher.lastActionKey = String(options?.actionKey || message);
+    hideLauncherStateBar();
   }
 
   function getGraph() {
@@ -1210,16 +1489,32 @@
     if (!node || !widget) return;
 
     try {
+      if (!widget.__hrioOriginalWidgetState) {
+        widget.__hrioOriginalWidgetState = {
+          type: widget.type,
+          label: widget.label,
+          name: widget.name,
+          disabled: widget.disabled,
+          hidden: widget.hidden,
+          computeSize: widget.computeSize,
+          draw: widget.draw,
+          options: Object.assign({}, widget.options || {}),
+        };
+      }
       widget.hidden = true;
       widget.disabled = true;
       widget.serialize = true;
       widget.label = "";
       widget.type = "hidden";
-      widget.computeSize = () => [0, 0];
+      widget.options = Object.assign({}, widget.options || {}, { hidden: true, minHeight: 0, maxHeight: 0 });
+      widget.computeSize = () => [0, -4];
       widget.draw = () => {};
+      widget.last_y = -100000;
+      widget.y = -100000;
 
-      const el = widget.inputEl || widget.element || widget.domElement || widget.textElement;
-      if (el && el.style) {
+      const els = [widget.inputEl, widget.element, widget.domElement, widget.textElement, widget.textarea].filter(Boolean);
+      for (const el of els) {
+        if (!el || !el.style) continue;
         el.style.display = "none";
         el.style.visibility = "hidden";
         el.style.height = "0px";
@@ -1229,6 +1524,84 @@
         el.style.pointerEvents = "none";
       }
     } catch {}
+  }
+
+  function showWidgetOnNode(node, widget) {
+    if (!node || !widget) return;
+    try {
+      const backup = widget.__hrioOriginalWidgetState || {};
+      widget.hidden = false;
+      widget.disabled = false;
+      widget.serialize = true;
+      widget.type = backup.type && backup.type !== "hidden" ? backup.type : "text";
+      widget.name = backup.name || widget.name || "automation_payload";
+      widget.label = backup.label || "自动化映射";
+      widget.options = Object.assign({}, backup.options || widget.options || {}, { hidden: false });
+      if (backup.computeSize) widget.computeSize = backup.computeSize;
+      else delete widget.computeSize;
+      if (backup.draw) widget.draw = backup.draw;
+      else delete widget.draw;
+      widget.last_y = 0;
+      widget.y = 0;
+
+      const els = [widget.inputEl, widget.element, widget.domElement, widget.textElement, widget.textarea].filter(Boolean);
+      for (const el of els) {
+        if (!el || !el.style) continue;
+        el.style.display = "";
+        el.style.visibility = "";
+        el.style.height = "";
+        el.style.minHeight = "";
+        el.style.maxHeight = "";
+        el.style.opacity = "";
+        el.style.pointerEvents = "";
+      }
+    } catch {}
+  }
+
+  function findAutomationToggleWidget(node) {
+    const widgets = Array.isArray(node?.widgets) ? node.widgets : [];
+    return widgets.find((widget) => widget && (widget[AUTOMATION_TOGGLE_WIDGET_MARK] || normalizeWidgetName(widget.name).startsWith("hrio_automation_toggle"))) || null;
+  }
+
+  function refreshAutomationPayloadVisibility(node) {
+    const widget = findWidget(node, ["automation_payload", "自动化映射"]);
+    if (!widget) return;
+    const expanded = !!node?.properties?.hrio_automation_payload_expanded;
+    if (expanded) showWidgetOnNode(node, widget);
+    else hideWidgetOnNode(node, widget);
+
+    const toggle = findAutomationToggleWidget(node);
+    if (toggle) {
+      toggle.name = expanded ? "自动化（点击收起 JSON）" : "自动化（默认隐藏，点击展开）";
+      toggle.label = toggle.name;
+      toggle.serialize = false;
+    }
+  }
+
+  function ensureAutomationToggleWidget(node) {
+    if (!node || !findWidget(node, ["automation_payload", "自动化映射"])) return;
+    let toggle = findAutomationToggleWidget(node);
+    if (!toggle && typeof node.addWidget === "function") {
+      try {
+        toggle = node.addWidget("button", "自动化（默认隐藏，点击展开）", null, () => {
+          node.properties = node.properties || {};
+          node.properties.hrio_automation_payload_expanded = !node.properties.hrio_automation_payload_expanded;
+          refreshAutomationPayloadVisibility(node);
+          markCanvasDirty(node);
+        });
+      } catch {}
+    }
+    if (toggle) {
+      toggle[AUTOMATION_TOGGLE_WIDGET_MARK] = true;
+      toggle.serialize = false;
+      toggle.callback = () => {
+        node.properties = node.properties || {};
+        node.properties.hrio_automation_payload_expanded = !node.properties.hrio_automation_payload_expanded;
+        refreshAutomationPayloadVisibility(node);
+        markCanvasDirty(node);
+      };
+    }
+    refreshAutomationPayloadVisibility(node);
   }
   function shouldHideWidgetForKind(kind, widgetName) {
     const n = normalizeWidgetName(widgetName);
@@ -1354,21 +1727,21 @@
             }
 
             if (shouldHideWidgetForKind(kind, n)) {
-              hideWidgetOnNode(node, widget);
+              refreshAutomationPayloadVisibility(node);
             }
           });
+          ensureAutomationToggleWidget(node);
           autoClearStaleAutomationPayloadOnNode(node);
         }
 
         const targetWidth = (kind === "video" || kind === "normal_video") ? 360 : (kind === "normal_single" ? 420 : 430);
-        const targetHeight = (kind === "video" || kind === "normal_video") ? 620 : (kind === "normal_single" ? 520 : 540);
+        const targetHeight = (kind === "video" || kind === "normal_video") ? 500 : (kind === "normal_single" ? 500 : 500);
         if (typeof node.setSize === "function" && node.size) {
           const w = Math.max(Number(node.size[0] || 0), targetWidth);
-          const h = (kind === "video" || kind === "normal_video") ? targetHeight : Math.max(Number(node.size[1] || 0), targetHeight);
-          node.setSize([w, h]);
+          node.setSize([w, targetHeight]);
         } else if (Array.isArray(node.size)) {
           node.size[0] = Math.max(Number(node.size[0] || 0), targetWidth);
-          node.size[1] = (kind === "video" || kind === "normal_video") ? targetHeight : Math.max(Number(node.size[1] || 0), targetHeight);
+          node.size[1] = targetHeight;
         }
 
         markCanvasDirty(node);
@@ -1478,7 +1851,7 @@
 
     state.lastConfig = config;
     setLauncherState(`已同步模板节点：${modeTitle || modeKey || "配置"}`, "syncing");
-    setTimeout(() => setLauncherState("普通节点保持手动输入，不会被覆盖", "ok"), 900);
+    setTimeout(() => setLauncherState("普通节点保持手动输入，不会被覆盖", "ok", { passive: true }), 900);
   }
 
   function applyRetryToNodes(command) {
@@ -1519,7 +1892,7 @@
       const automationEnabled = automationPayload && automationPayload.enabled !== false && Array.isArray(automationPayload.input_roots);
       if (automationEnabled) {
         const nextAutomationPayload = automationPayloadForRetry(automationPayload, command, view);
-        setWidgetValue(node, ["automation_payload", "自动化映射"], JSON.stringify(nextAutomationPayload, null, 2));
+        forceSetAutomationWidgetValue(node, JSON.stringify(nextAutomationPayload, null, 2));
       } else {
         const cacheKey = command.group?.cache_key || command.cache_key || "";
         if (cacheKey) {
@@ -1627,7 +2000,7 @@
     if (command.type === "runtime_update" || command.action === "runtime_update") {
       state.lastRuntime = command.runtime || command.payload || command;
       setLauncherState("收到运行结果", "syncing");
-      setTimeout(() => setLauncherState("模板节点已自动美化", "ok"), 800);
+      setTimeout(() => setLauncherState("模板节点已自动美化", "ok", { passive: true }), 800);
       return;
     }
 
@@ -1788,7 +2161,8 @@
           if (!isTemplateNode(node)) return;
           setTimeout(() => {
             beautifyTargetNodes();
-            if (bananaNodeKind(node) === "panel" && isAutomationHardClearMode()) forceSetAutomationWidgetValue(node, "");
+            ensureAutomationToggleWidget(node);
+            if (isAutomationHardClearMode()) forceSetAutomationWidgetValue(node, "");
           }, 60);
         },
 
@@ -1840,6 +2214,110 @@
     return data;
   }
 
+  function createVideoModal() {
+    injectStyle();
+
+    let modal = document.getElementById(VIDEO_MODAL_ID);
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = VIDEO_MODAL_ID;
+    modal.innerHTML = `
+      <div class="video-card">
+        <div class="video-head">
+          <div>
+            <strong>Hrio Design｜生成视频预览</strong>
+            <span>显示最近由 Hrio 视频节点下载到 ComfyUI temp 的视频。</span>
+          </div>
+          <div class="video-actions">
+            <button class="video-btn" data-video-refresh type="button">刷新</button>
+            <button class="video-close" data-video-close type="button">×</button>
+          </div>
+        </div>
+        <div class="video-body" data-video-list>
+          <div class="video-empty">正在读取视频记录...</div>
+        </div>
+      </div>
+    `;
+
+    const close = () => modal.classList.remove("show");
+    modal.querySelector("[data-video-close]").onclick = close;
+    modal.querySelector("[data-video-refresh]").onclick = () => refreshVideoModal(true);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) close();
+    });
+
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function videoViewUrlFromItem(item) {
+    const direct = String(item?.view_url || item?.url || "").trim();
+    if (direct) return direct;
+    const filename = String(item?.filename || "").trim();
+    if (!filename) return "";
+    const params = new URLSearchParams({
+      filename,
+      type: String(item?.type || "temp"),
+      subfolder: String(item?.subfolder || ""),
+    });
+    return "/view?" + params.toString();
+  }
+
+  function renderVideoModal(videos) {
+    const modal = document.getElementById(VIDEO_MODAL_ID);
+    if (!modal) return;
+    const list = modal.querySelector("[data-video-list]");
+    if (!list) return;
+
+    const items = Array.isArray(videos) ? videos : [];
+    if (!items.length) {
+      list.innerHTML = `<div class="video-empty">暂无视频记录。请先运行“🎨 Hrio｜生视频”或“🎨 Hrio｜普通生视频（单输出）”，生成成功后这里会显示最近视频。</div>`;
+      return;
+    }
+
+    list.innerHTML = items.slice(0, 20).map((item, index) => {
+      const url = videoViewUrlFromItem(item);
+      const label = escapeHtml(item.label || `视频 ${index + 1}`);
+      const when = item.updated_at_ms ? new Date(Number(item.updated_at_ms)).toLocaleString() : "";
+      const filename = escapeHtml(item.filename || item.local_path || item.source_url || "");
+      const mime = escapeHtml(item.mime || item.format || "video/mp4");
+      if (!url) {
+        return `<div class="video-empty">${label} 没有可播放地址：${filename}</div>`;
+      }
+      return `
+        <div class="video-item">
+          <div class="video-item-head">
+            <div><strong>${label}</strong><div>${escapeHtml(when)} · ${filename}</div></div>
+            <a class="video-btn" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">新窗口打开</a>
+          </div>
+          <video controls preload="metadata" src="${escapeHtml(url)}" type="${mime}"></video>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function refreshVideoModal(announce = false) {
+    const modal = createVideoModal();
+    const list = modal.querySelector("[data-video-list]");
+    if (list) list.innerHTML = `<div class="video-empty">正在读取视频记录...</div>`;
+    try {
+      const data = await getJson(RUNTIME_ROUTE);
+      const videos = Array.isArray(data.videos) ? data.videos : [];
+      renderVideoModal(videos);
+      if (announce) setLauncherState(`已读取视频：${videos.length} 条`, "ok");
+    } catch (error) {
+      if (list) list.innerHTML = `<div class="video-empty">视频记录读取失败：${escapeHtml(error.message || error)}</div>`;
+      if (announce) setLauncherState(`视频读取失败：${error.message || error}`, "error");
+    }
+  }
+
+  function openVideoModal() {
+    const modal = createVideoModal();
+    modal.classList.add("show");
+    refreshVideoModal(false);
+  }
+
   function createAutomationModal() {
     if (document.getElementById(MODAL_ID)) return;
 
@@ -1850,7 +2328,7 @@
         <div class="auto-head">
           <div>
             <strong>自动化分组批处理</strong>
-            <span>选择最多 10 个输入根目录和 1 个输出根目录；后端只扫描根目录下的直接图片文件，按图片文件名数字序号横向聚合并发执行。</span>
+            <span>选择最多 10 个输入项目根目录和 1 个输出根目录；后端递归扫描根目录及子文件夹，按图片文件名数字或父文件夹数字序号横向聚合并发执行。</span>
           </div>
           <button class="auto-close" data-auto-close type="button">×</button>
         </div>
@@ -1859,7 +2337,7 @@
           <div class="auto-row">
             <div class="auto-box">
               <h3>输入根目录</h3>
-              <div class="auto-muted">每个根目录下直接放图片，例如 001.png、002.png、003.png；不再使用 001_截图/ 子文件夹。序号规则：提取图片文件名中的所有数字并拼接。</div>
+              <div class="auto-muted">每个根目录可以直接放图片，例如 001.png、002.png；也可以放项目子文件夹，例如 001/front.png、001/reference.jpg。序号规则：优先提取图片文件名数字；文件名没有数字时使用最近父文件夹数字。</div>
               <div class="auto-actions">
                 <button class="auto-btn" data-auto-add-input-root type="button">添加输入根目录</button>
                 <button class="auto-btn secondary" data-auto-clear-input-root type="button">清空输入</button>
@@ -1989,7 +2467,7 @@
         const payload = buildAutomationPayload();
         navigator.clipboard?.writeText(JSON.stringify(payload, null, 2)).catch(() => {});
         setLauncherState("自动化 JSON 已复制", "syncing");
-        setTimeout(() => setLauncherState("模板节点已自动美化", "ok"), 900);
+        setTimeout(() => setLauncherState("模板节点已自动美化", "ok", { passive: true }), 900);
       };
     });
 
@@ -2039,6 +2517,7 @@
     loadAutomationFromStorage();
     renderAutomationModal();
     document.getElementById(MODAL_ID).classList.add("show");
+    scheduleAutomationPreview(260);
     fetchAutomationHistory(false);
   }
 
@@ -2086,7 +2565,8 @@
       state.automation.previewGroups = [];
       state.automation.lastPreview = null;
       renderAutomationModal();
-      setLauncherState("已添加输入根目录", "ok");
+      scheduleAutomationPreview(180);
+      setLauncherState("已添加输入根目录，正在自动预览分组", "ok");
     } catch (error) {
       console.warn("[Hrio Design] select input root failed:", error);
       setLauncherState(`选择失败：${error.message || error}`, "warn");
@@ -2103,28 +2583,163 @@
       state.automation.previewGroups = [];
       state.automation.lastPreview = null;
       renderAutomationModal();
-      setLauncherState("已选择输出根目录", "ok");
+      scheduleAutomationPreview(180);
+      setLauncherState("已选择输出根目录，正在自动预览分组", "ok");
     } catch (error) {
       console.warn("[Hrio Design] select output root failed:", error);
       setLauncherState(`选择失败：${error.message || error}`, "warn");
     }
   }
 
-  async function previewAutomationGroups() {
+  function canPreviewAutomationGroups() {
+    return Array.isArray(state.automation.inputRoots) && state.automation.inputRoots.length > 0;
+  }
+
+  function scheduleAutomationPreview(delay = 350) {
+    if (automationPreviewTimer) {
+      clearTimeout(automationPreviewTimer);
+      automationPreviewTimer = null;
+    }
+    if (!canPreviewAutomationGroups()) return;
+    const modal = document.getElementById(MODAL_ID);
+    if (!modal || !modal.classList.contains("show")) return;
+    automationPreviewTimer = setTimeout(() => {
+      automationPreviewTimer = null;
+      previewAutomationGroups({ silent: true });
+    }, Math.max(0, Number(delay) || 0));
+  }
+
+  async function previewAutomationGroups(options = {}) {
+    const silent = !!options.silent;
     try {
       const payload = buildAutomationPayload();
       if (!payload.input_roots.length) throw new Error("请先添加输入根目录");
-      if (!payload.output_root) throw new Error("请先选择输出根目录");
-      setLauncherState("正在预览自动化分组...", "syncing");
+      // 预览缩略图不强制要求输出目录；没选输出目录时，只是不显示最终 output_序号/run_01 路径。
+      if (!silent) setLauncherState("正在预览自动化分组缩略图...", "syncing");
       const data = await postJson(AUTOMATION_PREVIEW_ROUTE, payload);
-      state.automation.previewGroups = data.groups || [];
-      state.automation.lastPreview = data;
+      state.automation.previewGroups = Array.isArray(data.groups) ? data.groups : [];
+      state.automation.lastPreview = data || null;
       renderAutomationModal(false);
-      setLauncherState(`已预览 ${state.automation.previewGroups.length} 个序号组`, "ok");
+      const summary = data && data.scan_summary ? data.scan_summary : {};
+      const imageCount = Number(summary.image_count || 0);
+      const groupCount = state.automation.previewGroups.length;
+      if (groupCount) {
+        setLauncherState(`已预览 ${groupCount} 个序号组，输入图 ${imageCount} 张`, "ok");
+      } else {
+        setLauncherState(`已扫描 ${imageCount} 张图片，但没有形成序号组`, "warn");
+      }
     } catch (error) {
       console.warn("[Hrio Design] preview automation failed:", error);
-      setLauncherState(`预览失败：${error.message || error}`, "warn");
+      state.automation.lastPreview = {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+        scan_reports: [],
+        scan_summary: {},
+      };
+      renderAutomationModal(false);
+      if (!silent) setLauncherState(`预览失败：${error.message || error}`, "warn");
+      else setLauncherState(`自动预览失败：${error.message || error}`, "warn");
     }
+  }
+
+  function automationPreviewItems(group) {
+    if (!group || typeof group !== "object") return [];
+    if (Array.isArray(group.preview_items) && group.preview_items.length) return group.preview_items;
+    if (Array.isArray(group.items)) return group.items;
+    return [];
+  }
+
+
+  function renderAutomationScanReport(reports) {
+    reports = Array.isArray(reports) ? reports : [];
+    if (!reports.length) return "";
+    return `<div class="auto-scan-report">${reports.map((r) => {
+      const idx = Number(r.root_index || 0) + 1;
+      const path = String(r.root_path || "");
+      const exists = !!r.exists;
+      const scanned = Number(r.scanned_file_count || 0);
+      const images = Number(r.image_count || 0);
+      const seqs = Number(r.sequence_count || 0);
+      const noSeq = Number(r.skipped_no_sequence_count || 0);
+      const err = String(r.error || "");
+      const status = exists ? `${images} 图 / ${seqs} 组${noSeq ? ` / ${noSeq} 张无序号` : ""}` : "目录不存在";
+      return `
+        <div class="auto-scan-report-row" title="${escapeHtml(path + (err ? "\n" + err : ""))}">
+          <code>${idx}</code>
+          <div class="auto-scan-report-path">${escapeHtml(path || "-")}</div>
+          <div class="auto-scan-report-stat">${escapeHtml(err || status)} · 扫描 ${scanned}</div>
+        </div>
+      `;
+    }).join("")}</div>`;
+  }
+
+  function renderAutomationInputPreview(group) {
+    const items = automationPreviewItems(group);
+    if (!items.length) return `<div class="auto-muted">未找到输入图</div>`;
+
+    return `<div class="auto-thumb-grid">${items.map((item) => {
+      const rootIndex = Number(item.root_index || 0) + 1;
+      const fileName = String(item.relative_path || item.file_name || item.image_path || "");
+      const imagePath = String(item.image_path || "");
+      const thumb = String(item.thumb_data_url || item.preview_data_url || item.thumbnail || "");
+      const width = Number(item.width || 0);
+      const height = Number(item.height || 0);
+      const sizeText = width && height ? `${width}×${height}` : "";
+      const title = `${rootIndex}. ${fileName}${imagePath ? "\n" + imagePath : ""}${sizeText ? "\n" + sizeText : ""}`;
+      const imgHtml = thumb
+        ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(fileName)}" title="${escapeHtml(title)}" data-auto-thumb data-auto-thumb-title="${escapeHtml(title)}" />`
+        : `<div class="auto-thumb-empty" title="${escapeHtml(item.preview_error || imagePath || fileName)}">无图</div>`;
+      return `
+        <div class="auto-thumb-card" title="${escapeHtml(title)}">
+          ${imgHtml}
+          <div class="auto-thumb-meta">${rootIndex}. ${escapeHtml(fileName || "图片")}</div>
+          <div class="auto-thumb-sub">${escapeHtml(sizeText || "input")}</div>
+        </div>
+      `;
+    }).join("")}</div>`;
+  }
+
+  function openAutomationImagePreview(src, title = "") {
+    src = String(src || "").trim();
+    if (!src) return;
+    const old = document.querySelector(".hrio-auto-image-lightbox");
+    if (old) old.remove();
+    const box = document.createElement("div");
+    box.className = "hrio-auto-image-lightbox";
+    box.innerHTML = `
+      <div class="hrio-auto-image-lightbox-inner">
+        <img src="${escapeHtml(src)}" alt="${escapeHtml(title || "preview")}" />
+        <div class="hrio-auto-image-lightbox-caption">${escapeHtml(title || "点击空白处关闭")}</div>
+      </div>
+    `;
+    box.addEventListener("click", (event) => {
+      if (event.target === box) box.remove();
+    });
+    document.addEventListener("keydown", function onKeydown(event) {
+      if (event.key === "Escape") {
+        box.remove();
+        document.removeEventListener("keydown", onKeydown);
+      }
+    });
+    document.body.appendChild(box);
+  }
+
+  function sanitizeAutomationPreviewGroups(groups) {
+    return (Array.isArray(groups) ? groups : []).map((group) => ({
+      sequence: String(group.sequence || ""),
+      output_dir: String(group.output_dir || ""),
+      present_root_count: Number(group.present_root_count || 0),
+      expected_root_count: Number(group.expected_root_count || 0),
+      preview_count: Number(group.preview_count || automationPreviewItems(group).length || 0),
+      items: (Array.isArray(group.items) ? group.items : []).map((item) => ({
+        root_index: Number(item.root_index || 0),
+        root_path: String(item.root_path || ""),
+        source_type: String(item.source_type || "root_image"),
+        file_name: String(item.file_name || ""),
+        image_path: String(item.image_path || ""),
+        sequence: String(item.sequence || group.sequence || ""),
+      })),
+    }));
   }
 
   function renderAutomationModal(updateFields = true) {
@@ -2163,31 +2778,54 @@
 
     const summary = modal.querySelector("[data-auto-preview-summary]");
     const groups = state.automation.previewGroups || [];
+    const lastPreview = state.automation.lastPreview || null;
+    const scanReports = lastPreview && Array.isArray(lastPreview.scan_reports) ? lastPreview.scan_reports : [];
+    const scanSummary = lastPreview && lastPreview.scan_summary ? lastPreview.scan_summary : null;
     if (summary) {
-      summary.textContent = groups.length
-        ? `已预览 ${groups.length} 个序号组。执行时每个组只跑一次，最多 ${state.automation.groupConcurrency || 3} 组并发。`
-        : "尚未预览。";
+      if (groups.length) {
+        const imageCount = scanSummary ? Number(scanSummary.image_count || 0) : 0;
+        summary.textContent = `已预览 ${groups.length} 个序号组，输入图 ${imageCount || ""} 张。执行时每个组只跑一次，最多 ${state.automation.groupConcurrency || 3} 组并发。`;
+      } else if (lastPreview) {
+        const imageCount = scanSummary ? Number(scanSummary.image_count || 0) : 0;
+        const noSeq = scanSummary ? Number(scanSummary.skipped_no_sequence_count || 0) : 0;
+        summary.textContent = `已递归扫描 ${scanReports.length} 个输入目录，找到 ${imageCount} 张图片，形成 0 个序号组${noSeq ? `；${noSeq} 张图片没有数字序号` : ""}。`;
+      } else {
+        summary.textContent = canPreviewAutomationGroups() ? "已添加输入目录，正在等待预览。" : "尚未预览。";
+      }
     }
 
     const list = modal.querySelector("[data-auto-preview-list]");
     if (list) {
       if (!groups.length) {
-        list.innerHTML = `<tr><td colspan="4" class="auto-muted">点击“预览分组”后显示扫描结果。</td></tr>`;
+        const reportHtml = renderAutomationScanReport(scanReports);
+        const errorText = lastPreview && lastPreview.error ? `<div class="auto-muted">预览失败：${escapeHtml(lastPreview.error)}</div>` : "";
+        const hint = canPreviewAutomationGroups()
+          ? `没有扫描到可分组图片。请确认图片或父文件夹包含数字序号，例如 <code>001.png</code>、<code>001/front.png</code>。`
+          : `点击“添加输入根目录”后会自动预览分组。`;
+        list.innerHTML = `<tr><td colspan="4" class="auto-muted"><div>${hint}</div>${errorText}${reportHtml}</td></tr>`;
       } else {
         list.innerHTML = groups.map((g) => {
-          const rawItems = (g.items || []).map((it) => `${Number(it.root_index) + 1}. ${it.file_name || it.image_path || ""}`);
-          const items = rawItems.map((x) => escapeHtml(x)).join("<br>");
+          const previewItems = automationPreviewItems(g);
+          const rawItems = previewItems.map((it) => `${Number(it.root_index || 0) + 1}. ${it.relative_path || it.file_name || it.image_path || ""}`);
           const seq = String(g.sequence || "");
           const outDir = String(g.output_dir || "");
+          const countText = `${previewItems.length}/${g.expected_root_count || state.automation.inputRoots.length || previewItems.length}`;
           return `
             <tr>
-              <td><code>${escapeHtml(seq)}</code></td>
-              <td title="${escapeHtml(rawItems.join("\n"))}"><div class="auto-cell-main">${items || "-"}</div></td>
+              <td><code>${escapeHtml(seq)}</code><div class="auto-thumb-sub">${escapeHtml(countText)} 张</div></td>
+              <td title="${escapeHtml(rawItems.join("\n"))}">${renderAutomationInputPreview(g)}</td>
               <td title="${escapeHtml(outDir)}"><div class="auto-cell-main">${escapeHtml(outDir)}</div></td>
               <td><button class="auto-btn secondary" style="height:28px;padding:0 8px;" data-auto-run-group="${escapeHtml(seq)}" type="button">跑本组</button></td>
             </tr>
           `;
         }).join("");
+        list.querySelectorAll("[data-auto-thumb]").forEach((img) => {
+          img.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openAutomationImagePreview(img.getAttribute("src"), img.getAttribute("data-auto-thumb-title") || img.getAttribute("title") || "");
+          });
+        });
       }
     }
   }
@@ -2214,7 +2852,7 @@
         side: "side.png",
         back: "back.png",
       },
-      preview_groups: state.automation.previewGroups || [],
+      preview_groups: sanitizeAutomationPreviewGroups(state.automation.previewGroups || []),
     };
   }
 
@@ -2264,12 +2902,21 @@
   }
 
   function parseAutomationPayloadFromNode(node) {
+    const candidates = [];
     const widget = findWidget(node, ["automation_payload", "自动化映射"]);
-    if (!widget) return null;
-    try {
-      const data = typeof widget.value === "string" ? JSON.parse(widget.value) : widget.value;
-      if (data && typeof data === "object") return data;
-    } catch {}
+    if (widget) candidates.push(widget.value);
+    if (node && node.properties) {
+      candidates.push(node.properties.hrio_design_automation_payload);
+      candidates.push(node.properties.automation_payload);
+      candidates.push(node.properties["自动化映射"]);
+    }
+    for (const value of candidates) {
+      if (!value) continue;
+      try {
+        const data = typeof value === "string" ? JSON.parse(value) : value;
+        if (data && typeof data === "object") return data;
+      } catch {}
+    }
     return null;
   }
 
@@ -2414,9 +3061,10 @@
   }
 
   function forceSetAutomationWidgetValue(node, value = "") {
-    if (!node || !Array.isArray(node.widgets)) return 0;
+    if (!node) return 0;
     let count = 0;
-    node.widgets.forEach((widget, index) => {
+    const widgets = Array.isArray(node.widgets) ? node.widgets : [];
+    widgets.forEach((widget, index) => {
       const name = normalizeWidgetName(widget?.name || widget?.label || widget?.displayName || widget?.localized_name);
       if (name !== "automation_payload") return;
       try {
@@ -2431,14 +3079,23 @@
 
     try {
       node.properties = node.properties || {};
-      delete node.properties.automation_payload;
-      delete node.properties["自动化映射"];
-      node.properties.banana_automation_cleared_at = Date.now();
-      node.properties.banana_automation_disabled = value ? false : true;
+      if (value) {
+        node.properties.hrio_design_automation_payload = value;
+        node.properties.automation_payload = value;
+        node.properties.banana_automation_disabled = false;
+        delete node.properties.banana_automation_cleared_at;
+      } else {
+        delete node.properties.hrio_design_automation_payload;
+        delete node.properties.automation_payload;
+        delete node.properties["自动化映射"];
+        node.properties.banana_automation_cleared_at = Date.now();
+        node.properties.banana_automation_disabled = true;
+      }
     } catch {}
 
+    refreshAutomationPayloadVisibility(node);
     markCanvasDirty(node);
-    return count;
+    return count || (isTemplateNode(node) ? 1 : 0);
   }
 
   function clearAutomationDomFallback() {
@@ -2457,9 +3114,10 @@
   }
 
   function autoClearStaleAutomationPayloadOnNode(node) {
-    if (!node || !Array.isArray(node.widgets)) return false;
+    if (!node) return false;
     let changed = false;
-    node.widgets.forEach((widget, index) => {
+    const widgets = Array.isArray(node.widgets) ? node.widgets : [];
+    widgets.forEach((widget, index) => {
       const name = normalizeWidgetName(widget?.name || widget?.label || widget?.displayName || widget?.localized_name);
       if (name !== "automation_payload") return;
       const value = widget?.value;
@@ -2471,6 +3129,18 @@
         changed = true;
       }
     });
+    try {
+      const props = node.properties || {};
+      const propValue = props.hrio_design_automation_payload || props.automation_payload || props["自动化映射"];
+      if (shouldClearAutomationValue(propValue)) {
+        node.properties = props;
+        delete node.properties.hrio_design_automation_payload;
+        delete node.properties.automation_payload;
+        delete node.properties["自动化映射"];
+        changed = true;
+      }
+    } catch {}
+
     if (changed) {
       try {
         node.properties = node.properties || {};
@@ -2494,9 +3164,9 @@
   }
 
   function automationWidgetNodes() {
-    // v8.1.5：自动化 payload 是全节点能力。
-    // 只要节点本身带 automation_payload / 自动化映射 widget，就参与应用与清除；
-    // 但普通单图、普通三方案、普通视频和视频生成节点的 prompt / negative_prompt 仍保持用户手动输入，绝不被模板面板覆盖。
+    // 自动化 payload 是全节点能力：识别到的 Hrio 节点全部参与。
+    // 即使旧工作流里暂时没有 automation_payload widget，也会写入 node.properties，后端会从 PROMPT / EXTRA_PNGINFO 读取。
+    // 普通单图、普通三方案、普通视频和视频生成节点的手动提示词不会被模板面板覆盖。
     return allNodes().filter((node) => {
       if (isTemplateNode(node)) return true;
       return !!findWidget(node, ["automation_payload", "自动化映射"]);
@@ -2533,9 +3203,18 @@
       } catch {}
     });
     try {
-      if (node.properties) {
+      node.properties = node.properties || {};
+      if (value) {
+        node.properties.hrio_design_automation_payload = value;
+        node.properties.automation_payload = value;
+        node.properties.banana_automation_disabled = false;
+        delete node.properties.banana_automation_cleared_at;
+      } else {
+        delete node.properties.hrio_design_automation_payload;
         delete node.properties.automation_payload;
         delete node.properties["自动化映射"];
+        node.properties.banana_automation_disabled = true;
+        node.properties.banana_automation_cleared_at = Date.now();
       }
     } catch {}
     markCanvasDirty(node);
@@ -2588,7 +3267,7 @@
 
     if (announce) {
       setLauncherState(`已清除自动化：${nodes.length} 个节点`, "ok");
-      setTimeout(() => setLauncherState("全节点 automation_payload 已清空；普通节点提示词保持不变", "ok"), 1000);
+      setTimeout(() => setLauncherState("全节点 automation_payload 已清空；普通节点提示词保持不变", "ok", { passive: true }), 1000);
     }
   }
 
@@ -2653,7 +3332,7 @@
     if (announce) {
       const groupCount = Array.isArray(payload.preview_groups) && payload.preview_groups.length ? payload.preview_groups.length : "未预览";
       setLauncherState(`自动化已应用：${groupCount} 组 / ${appliedCount} 个节点`, "syncing");
-      setTimeout(() => setLauncherState("自动化已应用到全部可自动化节点", "ok"), 1200);
+      setTimeout(() => setLauncherState("自动化已应用到全部可自动化节点", "ok", { passive: true }), 1200);
     }
   }
 
@@ -2733,6 +3412,7 @@
       queueGraph,
       readLastStoredCommand,
       clearAutomationPayloadFromNodes,
+      openVideoModal,
       getGraph,
       resetFloatPosition: () => {
         try {
@@ -2750,8 +3430,8 @@
   }
 
   function init() {
-    if (window.__HRIO_DESIGN_BRIDGE_V815__) return;
-    window.__HRIO_DESIGN_BRIDGE_V815__ = true;
+    if (window.__HRIO_DESIGN_BRIDGE_V816__) return;
+    window.__HRIO_DESIGN_BRIDGE_V816__ = true;
 
     createLauncher();
     setupCommandBridge();

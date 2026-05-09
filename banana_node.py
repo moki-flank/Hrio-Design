@@ -1098,6 +1098,8 @@ _THREE_VIEW_SCOPE_MAP = {
 _LAST_THREE_VIEW_CACHE: Dict[str, Dict[str, torch.Tensor]] = {}
 _LAST_THREE_VIEW_RUNTIME: Dict[str, Dict[str, Any]] = {}
 _LAST_THREE_VIEW_LATEST_KEY: str = ""
+_LAST_VIDEO_RUNTIME: Dict[str, Dict[str, Any]] = {}
+_LAST_VIDEO_LATEST_KEY: str = ""
 
 
 
@@ -1338,6 +1340,8 @@ def _save_video_for_comfyui_preview(video_url_or_path: Any, label: str = "banana
         "format": mime,
         "mime": mime,
         "source": local_path,
+        "url": _comfyui_view_url(filename, media_type, subfolder),
+        "view_url": _comfyui_view_url(filename, media_type, subfolder),
     }
     return [item], local_path
 
@@ -1357,6 +1361,12 @@ def _return_video_with_ui_preview(result_tuple: Tuple[Any, ...], video_url_or_pa
                 result_list[1] = local_path
             result_tuple = tuple(result_list)
         if ui_videos:
+            _publish_video_runtime_result(
+                label=label,
+                source=video_url_or_path,
+                ui_videos=ui_videos,
+                local_path=local_path,
+            )
             return {"ui": {"videos": ui_videos}, "result": tuple(result_tuple)}
     except Exception as e:
         logger.warning(f"ComfyUI ui.videos 预览输出失败，继续返回原始结果: {e}")
@@ -1448,25 +1458,325 @@ def _publish_runtime_result(
     _LAST_THREE_VIEW_LATEST_KEY = key
 
 
+def _publish_single_image_runtime_result(
+    *,
+    cache_key: Any,
+    label: str,
+    model: str,
+    image_size: str,
+    aspect_ratio: str,
+    tensor: torch.Tensor | None = None,
+    error: str = "",
+    duplicate_to_all_variants: bool = False,
+) -> None:
+    """
+    将普通单图节点的结果同步到设计师面板的 /runtime。
+    设计师面板的“最近生成”按三方案结构读取，所以这里把单图结果映射到
+    front / variant_a，并按需补齐其余视图，保证可以直接预览。
+    """
+    global _LAST_THREE_VIEW_LATEST_KEY
+
+    key = _cache_key_or_default(cache_key)
+    now = time.time()
+
+    image_data = ""
+    if tensor is not None:
+        try:
+            image_data = _tensor_to_preview_data_url(tensor)
+        except Exception:
+            image_data = ""
+
+    normalized_error = str(error or "").strip()
+    base_status = "success"
+    if normalized_error:
+        base_status = "failed"
+    elif not image_data:
+        base_status = "missing"
+
+    def _view_payload(view_key: str, display_label: str, use_image: bool) -> Dict[str, Any]:
+        has_image = bool(use_image and image_data)
+        status = base_status if has_image or normalized_error else "missing"
+        failed = bool(normalized_error)
+        return {
+            "view": view_key,
+            "label": display_label,
+            "status": status,
+            "failed": failed,
+            "placeholder": not has_image,
+            "from_cache": False,
+            "needs_regenerate": failed or not has_image,
+            "seed": "",
+            "attempt": "",
+            "max_retry": "",
+            "elapsed": 0.0,
+            "info": normalized_error if failed else ("普通单图结果" if has_image else "暂无图片"),
+            "error": normalized_error if failed else "",
+            "image": image_data if has_image else "",
+        }
+
+    views: Dict[str, Any] = {}
+    assignments = [
+        ("front", "正面图", True),
+        ("side", "侧面图", bool(duplicate_to_all_variants and image_data)),
+        ("back", "背面图", bool(duplicate_to_all_variants and image_data)),
+    ]
+    alias_map = {"front": ("variant_a", "方案 A"), "side": ("variant_b", "方案 B"), "back": ("variant_c", "方案 C")}
+
+    for view_key, display_label, use_image in assignments:
+        payload = _view_payload(view_key, display_label, use_image)
+        views[view_key] = payload
+        alias_key, alias_label = alias_map[view_key]
+        alias_payload = dict(payload)
+        alias_payload["view"] = alias_key
+        alias_payload["label"] = alias_label
+        views[alias_key] = alias_payload
+
+    _LAST_THREE_VIEW_RUNTIME[key] = {
+        "cache_key": key,
+        "mode_actual": "",
+        "mode_key": "",
+        "template_key": "",
+        "template_display": str(label or "普通单图"),
+        "mode_display": str(label or "普通单图"),
+        "labels_prefix": str(label or "普通单图"),
+        "output_strategy": "single_image",
+        "node_type": "normal_single_image",
+        "model": model,
+        "image_size": image_size,
+        "aspect_ratio": aspect_ratio,
+        "generate_scope": "单图",
+        "updated_at": now,
+        "updated_at_ms": int(now * 1000),
+        "has_error": any(bool(v.get("needs_regenerate")) for v in views.values()),
+        "views": views,
+    }
+    _LAST_THREE_VIEW_LATEST_KEY = key
+
 def _runtime_results_payload() -> Dict[str, Any]:
     groups = sorted(
         _LAST_THREE_VIEW_RUNTIME.values(),
         key=lambda x: float(x.get("updated_at") or 0),
         reverse=True,
     )
+    videos = sorted(
+        _LAST_VIDEO_RUNTIME.values(),
+        key=lambda x: float(x.get("updated_at") or 0),
+        reverse=True,
+    )
     return {
         "ok": True,
         "latest_key": _LAST_THREE_VIEW_LATEST_KEY,
+        "latest_video_key": _LAST_VIDEO_LATEST_KEY,
         "count": len(groups),
+        "video_count": len(videos),
         "groups": groups,
+        "videos": videos,
     }
 
 
 def _clear_runtime_results() -> Dict[str, Any]:
-    global _LAST_THREE_VIEW_LATEST_KEY
+    global _LAST_THREE_VIEW_LATEST_KEY, _LAST_VIDEO_LATEST_KEY
     _LAST_THREE_VIEW_RUNTIME.clear()
     _LAST_THREE_VIEW_LATEST_KEY = ""
-    return {"ok": True, "message": "已清空 Hrio Design 三方案运行期预览缓存"}
+    _LAST_VIDEO_RUNTIME.clear()
+    _LAST_VIDEO_LATEST_KEY = ""
+    return {"ok": True, "message": "已清空 Hrio Design 运行期预览缓存"}
+
+
+def _comfyui_view_url(filename: Any, media_type: str = "temp", subfolder: str = "") -> str:
+    filename = str(filename or "").strip()
+    if not filename:
+        return ""
+    try:
+        from urllib.parse import urlencode
+        return "/view?" + urlencode({
+            "filename": filename,
+            "type": str(media_type or "temp"),
+            "subfolder": str(subfolder or ""),
+        })
+    except Exception:
+        return f"/view?filename={filename}&type={media_type or 'temp'}&subfolder={subfolder or ''}"
+
+
+def _publish_video_runtime_result(
+    *,
+    label: str,
+    source: Any = "",
+    ui_videos: List[Dict[str, Any]] | None = None,
+    local_path: str = "",
+) -> None:
+    global _LAST_VIDEO_LATEST_KEY
+
+    try:
+        videos = list(ui_videos or [])
+        if not videos and not local_path and not source:
+            return
+
+        now = time.time()
+        key = f"video:{int(now * 1000)}:{random.randint(1000, 9999)}"
+        first = videos[0] if videos else {}
+        filename = str(first.get("filename") or os.path.basename(str(local_path or source or ""))).strip()
+        subfolder = str(first.get("subfolder") or "")
+        media_type = str(first.get("type") or "temp")
+        view_url = str(first.get("url") or first.get("view_url") or _comfyui_view_url(filename, media_type, subfolder))
+
+        _LAST_VIDEO_RUNTIME[key] = {
+            "key": key,
+            "label": str(label or "Hrio Design 视频"),
+            "updated_at": now,
+            "updated_at_ms": int(now * 1000),
+            "filename": filename,
+            "subfolder": subfolder,
+            "type": media_type,
+            "format": str(first.get("format") or first.get("mime") or _guess_video_mime_from_value(filename or source)),
+            "mime": str(first.get("mime") or first.get("format") or _guess_video_mime_from_value(filename or source)),
+            "view_url": view_url,
+            "url": view_url,
+            "source_url": str(source or ""),
+            "local_path": str(local_path or ""),
+        }
+        _LAST_VIDEO_LATEST_KEY = key
+
+        # 只保留最近 60 条，避免长时间运行导致内存膨胀。
+        if len(_LAST_VIDEO_RUNTIME) > 60:
+            old_keys = sorted(
+                _LAST_VIDEO_RUNTIME.keys(),
+                key=lambda k: float((_LAST_VIDEO_RUNTIME.get(k) or {}).get("updated_at") or 0),
+            )
+            for old_key in old_keys[: max(0, len(_LAST_VIDEO_RUNTIME) - 60)]:
+                _LAST_VIDEO_RUNTIME.pop(old_key, None)
+    except Exception as e:
+        logger.warning(f"Hrio Design 视频运行期缓存写入失败: {e}")
+
+
+def _coerce_json_object(value: Any) -> Any:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            return json.loads(text)
+        except Exception:
+            return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _extract_automation_payload_from_workflow(extra_pnginfo: Any, unique_id: Any) -> str:
+    uid = str(unique_id or "").strip()
+    if not uid:
+        return ""
+
+    data = _coerce_json_object(extra_pnginfo)
+    workflow = data.get("workflow") if isinstance(data, dict) else {}
+    workflow = _coerce_json_object(workflow)
+    nodes = workflow.get("nodes") if isinstance(workflow, dict) else []
+
+    if not isinstance(nodes, list):
+        return ""
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        if str(node.get("id") or "").strip() != uid:
+            continue
+
+        props = node.get("properties") or {}
+        if isinstance(props, dict):
+            for key in (
+                "hrio_design_automation_payload",
+                "automation_payload",
+                "自动化映射",
+                "banana_automation_payload",
+            ):
+                value = props.get(key)
+                if value is None:
+                    continue
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, ensure_ascii=False)
+                text = str(value or "").strip()
+                if text:
+                    return text
+
+        # 兼容极少数旧工作流：automation_payload 仍保存在 widgets_values 里。
+        for value in node.get("widgets_values") or []:
+            if isinstance(value, str) and "input_roots" in value and "enabled" in value:
+                return value
+
+    return ""
+
+
+def _extract_automation_payload_from_prompt(prompt_graph: Any, unique_id: Any) -> str:
+    uid = str(unique_id or "").strip()
+    data = _coerce_json_object(prompt_graph)
+    if not uid or not isinstance(data, dict):
+        return ""
+
+    node = data.get(uid) or data.get(int(uid)) if uid.isdigit() else data.get(uid)
+    if not isinstance(node, dict):
+        return ""
+
+    for bucket_name in ("inputs", "properties"):
+        bucket = node.get(bucket_name) or {}
+        if not isinstance(bucket, dict):
+            continue
+        for key in ("hrio_design_automation_payload", "automation_payload", "自动化映射"):
+            value = bucket.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (dict, list)):
+                return json.dumps(value, ensure_ascii=False)
+            text = str(value or "").strip()
+            if text:
+                return text
+    return ""
+
+
+def _resolve_automation_payload(
+    automation_payload: Any = "",
+    *,
+    unique_id: Any = None,
+    prompt: Any = None,
+    extra_pnginfo: Any = None,
+) -> str:
+    text = str(automation_payload or "").strip()
+    if text:
+        return text
+
+    text = _extract_automation_payload_from_prompt(prompt, unique_id)
+    if text:
+        return text
+
+    text = _extract_automation_payload_from_workflow(extra_pnginfo, unique_id)
+    if text:
+        return text
+
+    return ""
+
+
+def _automation_payload_widget() -> Tuple[str, Dict[str, Any]]:
+    """
+    给所有 Hrio 节点保留一个可序列化的自动化 JSON 入口。
+
+    注意：这里不能放到 hidden 里，因为 ComfyUI 的 hidden 主要用于 UNIQUE_ID / PROMPT / EXTRA_PNGINFO。
+    前端会把这个 widget 默认折叠/隐藏，只保留后台序列化和执行时读取能力。
+    """
+    return (
+        "STRING",
+        {
+            "default": "",
+            "multiline": True,
+            "tooltip": "自动化 JSON。前端默认隐藏，只在点击节点上的自动化折叠按钮后显示；后台仍会序列化并参与运行。",
+        },
+    )
+
+
+def _compose_single_image_prompt(prompt: str, negative_prompt: str = "") -> str:
+    clean_prompt = str(prompt or "").strip()
+    final_prompt = clean_prompt
+    if str(negative_prompt or "").strip():
+        final_prompt += "\n\n负面约束：" + str(negative_prompt).strip()
+    final_prompt += "\n\n输出要求：只输出一张完整图片，不要拼图，不要多视图排版，不要文字标注，不要水印。"
+    return final_prompt
 
 def _node_base_values(
     api_key: str,
@@ -2168,7 +2478,7 @@ def _automation_history_now_ms() -> int:
 
 def _automation_history_existing_files(output_dir: str) -> Dict[str, str]:
     output_dir = str(output_dir or "")
-    names = ["front.png", "side.png", "back.png", "result.mp4", "run_info.json", "error.txt"]
+    names = ["front.png", "side.png", "back.png", "single.png", "single_image.png", "result.png", "result.mp4", "run_info.json", "error.txt"]
     out: Dict[str, str] = {}
     for name in names:
         path = os.path.join(output_dir, name) if output_dir else ""
@@ -2296,6 +2606,115 @@ def _run_three_view_automation_group(
         return fail_meta
 
 
+
+def _run_single_image_automation_group(
+    *,
+    group: Dict[str, Any],
+    cfg: Dict[str, Any],
+    api_key: str,
+    prompt: str,
+    model: str,
+    image_size: str,
+    aspect_ratio: str,
+    negative_prompt: str = "",
+    cache_key: str = "",
+) -> Dict[str, Any]:
+    """普通单图节点的自动化单组执行。"""
+    seq = str(group.get("sequence") or "")
+    run_dir = str(group.get("output_dir") or os.path.join(cfg["output_root"], f"output_{seq}", "run_01"))
+    os.makedirs(run_dir, exist_ok=True)
+    try:
+        image_paths = _collect_automation_group_images(
+            group.get("items") or [],
+            int(cfg.get("max_images_per_group") or 10),
+        )
+        if not image_paths:
+            raise RuntimeError(f"序号 {seq} 没有找到可用图片")
+
+        tensors = _load_image_tensors_from_paths(image_paths)
+        upload_dir = _cfg_or_manifest("upload_dir", "uploads/images")
+        image_urls = _tensors_to_uploaded_urls(tensors, api_key, upload_dir)
+        final_prompt = _compose_single_image_prompt(prompt, negative_prompt)
+
+        item = _single_image_generation_job(
+            f"普通单图自动化{seq}",
+            _node_base_values(
+                api_key,
+                final_prompt,
+                model,
+                image_size,
+                aspect_ratio,
+                auto_retry_until_success=True,
+                max_retry_per_view=_safe_int(_cfg_or_manifest("max_retry_per_view", "6"), 6, 1, 999),
+                retry_interval_sec=_safe_float(_cfg_or_manifest("retry_interval_sec", "1.5"), 1.5, 0.1, 30.0),
+            ),
+            image_urls,
+        )
+
+        image_out = item.get("tensor")
+        if image_out is None:
+            raise RuntimeError("普通单图自动化没有返回图片")
+
+        image_names = cfg.get("image_filenames") if isinstance(cfg.get("image_filenames"), dict) else {}
+        image_name = str(image_names.get("single") or image_names.get("image") or "single.png")
+        local_image_path = ""
+        if bool(cfg.get("save_images", True)):
+            local_image_path = os.path.join(run_dir, image_name)
+            _save_tensor_image(image_out, local_image_path)
+
+        meta = {
+            "sequence": seq,
+            "ok": True,
+            "node_type": "normal_single_image",
+            "output_dir": run_dir,
+            "input_image_count": len(image_paths),
+            "uploaded_image_count": len(image_urls),
+            "source_images": image_paths,
+            "local_image_path": local_image_path,
+            "model": item.get("model") or model,
+            "display_model": item.get("display_model") or model,
+            "image_size": item.get("image_size") or image_size,
+            "aspect_ratio": item.get("aspect_ratio") or aspect_ratio,
+            "seed": item.get("seed"),
+            "attempt": item.get("attempt"),
+            "note": "普通单图自动化会把同序号输入图作为参考图，输出一张 single.png。",
+        }
+        _publish_single_image_runtime_result(
+            cache_key=f"{cache_key}:{seq}" if cache_key else f"normal_single_image_automation:{seq}",
+            label=f"普通单图自动化 · 序号 {seq}",
+            model=str(item.get("display_model") or item.get("model") or model),
+            image_size=str(item.get("image_size") or image_size),
+            aspect_ratio=str(item.get("aspect_ratio") or aspect_ratio),
+            tensor=image_out,
+        )
+        _write_text_file(os.path.join(run_dir, "run_info.json"), json.dumps(meta, ensure_ascii=False, indent=2))
+        _append_automation_history_record(meta)
+        return {**meta, "image": image_out}
+    except Exception as e:
+        _write_text_file(os.path.join(run_dir, "error.txt"), f"{type(e).__name__}: {e}")
+        logger.error(f"普通单图自动化序号 {seq} 失败: {e}")
+        _publish_single_image_runtime_result(
+            cache_key=f"{cache_key}:{seq}" if cache_key else f"normal_single_image_automation:{seq}",
+            label=f"普通单图自动化 · 序号 {seq}",
+            model=model,
+            image_size=image_size,
+            aspect_ratio=aspect_ratio,
+            tensor=None,
+            error=str(e),
+        )
+        fail_meta = {
+            "sequence": seq,
+            "ok": False,
+            "node_type": "normal_single_image",
+            "output_dir": run_dir,
+            "error": str(e),
+            "model": model,
+            "image_size": image_size,
+            "aspect_ratio": aspect_ratio,
+        }
+        _append_automation_history_record(fail_meta)
+        return fail_meta
+
 def _run_video_automation_group(
     *,
     group: Dict[str, Any],
@@ -2381,6 +2800,100 @@ def _run_video_automation_group(
         _append_automation_history_record(fail_meta)
         return fail_meta
 
+
+def _run_video_automation_batch(
+    *,
+    resolved_key: str,
+    prompt: str,
+    video_model: str,
+    video_resolution: str,
+    aspect_ratio: str,
+    automation_payload: str,
+    output_kind: str = "video",
+) -> Dict[str, Any]:
+    start = time.time()
+    cfg = _auto_normalize_payload(automation_payload, save_images_default=False, save_video_default=True)
+    if not cfg.get("input_roots"):
+        return {"ok": False, "error": "自动化已启用，但没有 input_roots。", "lines": ["❌ Hrio Design 生视频自动化失败", "自动化已启用，但没有 input_roots。"]}
+    if not cfg.get("output_root"):
+        return {"ok": False, "error": "自动化已启用，但没有 output_root。", "lines": ["❌ Hrio Design 生视频自动化失败", "自动化已启用，但没有 output_root。"]}
+
+    groups = _build_automation_sequence_groups(
+        cfg["input_roots"],
+        output_root=cfg["output_root"],
+        require_all_roots_present=bool(cfg.get("require_all_roots_present")),
+    )
+    all_group_count = len(groups)
+    run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
+    if run_sequences:
+        groups = [g for g in groups if str(g.get("sequence") or "") in run_sequences]
+    if not groups:
+        if run_sequences:
+            msg = f"自动化没有找到指定序号组：{', '.join(sorted(run_sequences))}。"
+        else:
+            msg = "自动化没有扫描到任何有效序号组。"
+        return {"ok": False, "error": msg, "lines": ["❌ Hrio Design 生视频自动化失败", msg]}
+
+    group_concurrency = int(cfg.get("group_concurrency") or 3)
+    results: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=max(1, min(10, group_concurrency))) as executor:
+        futures = [
+            executor.submit(
+                _run_video_automation_group,
+                group=group,
+                cfg=cfg,
+                api_key=resolved_key,
+                prompt=prompt,
+                video_model=video_model,
+                video_resolution=video_resolution,
+                aspect_ratio=aspect_ratio,
+            )
+            for group in groups
+        ]
+        for future in as_completed(futures):
+            results.append(future.result())
+
+    results.sort(key=lambda x: _auto_sequence_sort_key(str(x.get("sequence") or "")))
+    ok_results = [r for r in results if r.get("ok")]
+    fail_results = [r for r in results if not r.get("ok")]
+    elapsed = time.time() - start
+    last_ok = (ok_results[-1] if ok_results else {})
+    mp4url = str(last_ok.get("mp4url") or "")
+    local_video_path = str(last_ok.get("local_video_path") or "")
+    title = "普通单输出视频自动化批处理完成" if output_kind == "normal_video_single" else "Hrio Design 生视频自动化批处理完成"
+    lines = [
+        f"✅ {title}，耗时 {elapsed:.1f}s",
+        f"video_model: {video_model}",
+        f"video_resolution: {_normalize_video_resolution(video_resolution)}",
+        f"aspect_ratio: {_normalize_video_aspect_ratio(aspect_ratio)}",
+        "enable_oss: True",
+        f"input_roots: {len(cfg['input_roots'])}",
+        f"groups: {len(groups)} / all_groups: {all_group_count}",
+        f"run_sequences: {', '.join(sorted(run_sequences)) if run_sequences else '全部'}",
+        f"success: {len(ok_results)}",
+        f"failed: {len(fail_results)}",
+        f"group_concurrency: {group_concurrency}",
+        f"max_images_per_group: {cfg.get('max_images_per_group')}",
+        f"output_root: {cfg['output_root']}",
+        "输入规则: 只扫描输入根目录下的直接图片文件，例如 input_root_01/001.png；输出目录规则: output_序号/run_01/，视频文件 result.mp4。",
+    ]
+    for r in results:
+        if r.get("ok"):
+            lines.append(f"✅ {r.get('sequence')} -> {r.get('output_dir')} | 输入图片 {r.get('input_image_count')} 张 | mp4={r.get('mp4url')}")
+        else:
+            lines.append(f"❌ {r.get('sequence')} -> {r.get('output_dir')} | {r.get('error')}")
+
+    return {
+        "ok": True,
+        "lines": lines,
+        "results": results,
+        "mp4url": mp4url,
+        "local_video_path": local_video_path,
+        "success": len(ok_results),
+        "failed": len(fail_results),
+    }
+
+
 class HrioBananaNormalThreeViewConcurrentNodeV330:
     RETURN_TYPES = ("IMAGE", "IMAGE", "IMAGE", "IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("front_image", "side_image", "back_image", "images", "info", "mp4url")
@@ -2417,14 +2930,14 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
         optional = {
             "global_prompt": ("STRING", {"default": "通用设计要求：面向平面设计师与室内设计师，输出专业设计提案级画面。请保持参考图的核心设计语言、色彩气质、材质关系、空间比例或版式秩序；画面高级、干净、真实、可落地，不要生成真实文字。", "multiline": True, "tooltip": "会自动拼到方案 A/B/C 三个提示词前面，用于控制整体设计方向。"}),
             "negative_prompt": ("STRING", {"default": "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格标签，不要促销元素，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要错误透视，不要杂乱拼贴，不要廉价滤镜。", "multiline": True, "tooltip": "会自动拼到三个方案提示词里。"}),
-            "automation_payload": ("STRING", {"default": "", "multiline": True, "tooltip": "自动化批处理 JSON；启用后会扫描最多 10 个输入根目录下的同序号图片并发处理。"}),
+            "automation_payload": _automation_payload_widget(),
         }
 
         slot_count = int(cfg.get("optional_image_slots") or _NODE.get("optional_image_slots", 10) or 10)
         for i in range(1, slot_count + 1):
             optional[f"image_{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}；同一批上传图会复用到正面/侧面/背面三个并发请求"})
 
-        return {"required": required, "optional": optional, "hidden": {"unique_id": "UNIQUE_ID"}}
+        return {"required": required, "optional": optional, "hidden": {"unique_id": "UNIQUE_ID", "prompt_graph": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"}}
 
     def generate(
         self,
@@ -2443,10 +2956,18 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
         negative_prompt: str = "",
         automation_payload: str = "",
         unique_id=None,
+        prompt_graph=None,
+        extra_pnginfo=None,
         **kwargs,
     ):
         start = time.time()
         resolved_key = str(api_key or "").strip() or _cfg("api_key", "")
+        automation_payload = _resolve_automation_payload(
+            automation_payload,
+            unique_id=unique_id,
+            prompt=prompt_graph,
+            extra_pnginfo=extra_pnginfo,
+        )
 
         if not resolved_key:
             msg = "请在节点中填入 API Key"
@@ -2603,6 +3124,7 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
             img = _error_img(msg)
             return _return_images_with_ui_preview((img, img, img, img, msg, ""), label="banana_error")
         group_concurrency = int(cfg.get("group_concurrency") or 3)
+        run_cache_key = f"normal_three_view_automation:{unique_id or int(time.time() * 1000)}"
         results: List[Dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=max(1, min(10, group_concurrency))) as executor:
             futures = [executor.submit(
@@ -2966,6 +3488,7 @@ class HrioBananaNormalSingleImageNode:
                     "tooltip": "负面提示词，会拼进请求提示词里。",
                 },
             ),
+            "automation_payload": _automation_payload_widget(),
         }
 
         slot_count = int(_NODE.get("optional_image_slots", 10) or 10)
@@ -3019,7 +3542,7 @@ class HrioBananaNormalSingleImageNode:
                 ),
             },
             "optional": optional,
-            "hidden": {"unique_id": "UNIQUE_ID"},
+            "hidden": {"unique_id": "UNIQUE_ID", "prompt_graph": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
 
     def generate(
@@ -3030,11 +3553,20 @@ class HrioBananaNormalSingleImageNode:
         image_size: str = "2K",
         aspect_ratio: str = "Auto",
         negative_prompt: str = "",
+        automation_payload: str = "",
         unique_id=None,
+        prompt_graph=None,
+        extra_pnginfo=None,
         **kwargs,
     ):
         start = time.time()
         resolved_key = str(api_key or "").strip() or _cfg("api_key", "")
+        automation_payload = _resolve_automation_payload(
+            automation_payload,
+            unique_id=unique_id,
+            prompt=prompt_graph,
+            extra_pnginfo=extra_pnginfo,
+        )
 
         if not resolved_key:
             msg = "请在节点中填入 API Key，或在 config.ini 的 [banana] 下配置 api_key"
@@ -3047,10 +3579,19 @@ class HrioBananaNormalSingleImageNode:
             logger.error(msg)
             return _return_images_with_ui_preview((_error_img(msg),), label="banana_normal_single_error")
 
-        final_prompt = clean_prompt
-        if str(negative_prompt or "").strip():
-            final_prompt += "\n\n负面约束：" + str(negative_prompt).strip()
-        final_prompt += "\n\n输出要求：只输出一张完整图片，不要拼图，不要多视图排版，不要文字标注，不要水印。"
+        if _automation_enabled(automation_payload):
+            return self.generate_automation(
+                resolved_key=resolved_key,
+                prompt=prompt,
+                model=model,
+                image_size=image_size,
+                aspect_ratio=aspect_ratio,
+                negative_prompt=negative_prompt,
+                automation_payload=automation_payload,
+                unique_id=unique_id,
+            )
+
+        final_prompt = _compose_single_image_prompt(prompt, negative_prompt)
 
         try:
             image_urls = _upload_reference_images_for_node(kwargs, resolved_key)
@@ -3082,11 +3623,103 @@ class HrioBananaNormalSingleImageNode:
             image_out = item.get("tensor")
             if image_out is None:
                 image_out = _error_img("普通单图节点没有返回图片")
+            _publish_single_image_runtime_result(
+                cache_key=f"normal_single_image_manual:{unique_id or 'default'}",
+                label="普通单图节点",
+                model=str(item.get("display_model") or item.get("model") or model),
+                image_size=str(item.get("image_size") or image_size),
+                aspect_ratio=str(item.get("aspect_ratio") or aspect_ratio),
+                tensor=image_out,
+            )
             return _return_images_with_ui_preview((image_out,), label="banana_normal_single_image")
         except Exception as e:
             msg = str(e)[:2500]
             logger.error(f"普通单图节点生成失败: {msg}")
+            _publish_single_image_runtime_result(
+                cache_key=f"normal_single_image_manual:{unique_id or 'default'}",
+                label="普通单图节点",
+                model=model,
+                image_size=image_size,
+                aspect_ratio=aspect_ratio,
+                tensor=None,
+                error=msg,
+            )
             return _return_images_with_ui_preview((_error_img(f"普通单图节点生成失败：{msg[:220]}"),), label="banana_normal_single_error")
+
+
+    def generate_automation(
+        self,
+        *,
+        resolved_key: str,
+        prompt: str,
+        model: str,
+        image_size: str = "2K",
+        aspect_ratio: str = "Auto",
+        negative_prompt: str = "",
+        automation_payload: str = "",
+        unique_id=None,
+    ):
+        start = time.time()
+        cfg = _auto_normalize_payload(automation_payload, save_images_default=True, save_video_default=False)
+        if not cfg.get("input_roots"):
+            return _return_images_with_ui_preview((_error_img("普通单图自动化失败：没有 input_roots"),), label="banana_normal_single_automation_error")
+        if not cfg.get("output_root"):
+            return _return_images_with_ui_preview((_error_img("普通单图自动化失败：没有 output_root"),), label="banana_normal_single_automation_error")
+
+        groups = _build_automation_sequence_groups(
+            cfg["input_roots"],
+            output_root=cfg["output_root"],
+            require_all_roots_present=bool(cfg.get("require_all_roots_present")),
+        )
+        all_group_count = len(groups)
+        run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
+        if run_sequences:
+            groups = [g for g in groups if str(g.get("sequence") or "") in run_sequences]
+        if not groups:
+            msg = f"普通单图自动化没有找到指定序号组：{', '.join(sorted(run_sequences))}" if run_sequences else "普通单图自动化没有扫描到任何有效序号组"
+            return _return_images_with_ui_preview((_error_img(msg),), label="banana_normal_single_automation_error")
+
+        group_concurrency = int(cfg.get("group_concurrency") or 3)
+        run_cache_key = f"normal_single_image_automation:{unique_id or int(time.time() * 1000)}"
+        results: List[Dict[str, Any]] = []
+        with ThreadPoolExecutor(max_workers=max(1, min(10, group_concurrency))) as executor:
+            futures = [
+                executor.submit(
+                    _run_single_image_automation_group,
+                    group=group,
+                    cfg=cfg,
+                    api_key=resolved_key,
+                    prompt=prompt,
+                    model=model,
+                    image_size=image_size,
+                    aspect_ratio=aspect_ratio,
+                    negative_prompt=negative_prompt,
+                    cache_key=run_cache_key,
+                )
+                for group in groups
+            ]
+            for future in as_completed(futures):
+                results.append(future.result())
+
+        results.sort(key=lambda x: _auto_sequence_sort_key(str(x.get("sequence") or "")))
+        ok_results = [r for r in results if r.get("ok")]
+        fail_results = [r for r in results if not r.get("ok")]
+        elapsed = time.time() - start
+        last_ok = ok_results[-1] if ok_results else {}
+        image_out = last_ok.get("image") if isinstance(last_ok, dict) else None
+        if image_out is None:
+            image_out = _error_img("普通单图自动化没有成功图片")
+
+        logger.summary("普通单图自动化完成", {
+            "模型": model,
+            "耗时": f"{elapsed:.1f}s",
+            "input_roots": len(cfg["input_roots"]),
+            "groups": f"{len(groups)} / {all_group_count}",
+            "success": len(ok_results),
+            "failed": len(fail_results),
+            "output_root": cfg["output_root"],
+        })
+        return _return_images_with_ui_preview((image_out,), label="banana_normal_single_automation")
 
 
 class HrioBananaNormalVideoSingleOutputNode:
@@ -3115,7 +3748,9 @@ class HrioBananaNormalVideoSingleOutputNode:
         if default_video_aspect not in video_aspect_options:
             default_video_aspect = video_aspect_options[0]
 
-        optional = {}
+        optional = {
+            "automation_payload": _automation_payload_widget(),
+        }
         slot_count = int(_NODE.get("optional_image_slots", 10) or 10)
         slot_count = max(1, min(10, slot_count))
         for i in range(1, slot_count + 1):
@@ -3167,7 +3802,7 @@ class HrioBananaNormalVideoSingleOutputNode:
                 ),
             },
             "optional": optional,
-            "hidden": {"unique_id": "UNIQUE_ID"},
+            "hidden": {"unique_id": "UNIQUE_ID", "prompt_graph": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
 
     def generate(
@@ -3177,16 +3812,35 @@ class HrioBananaNormalVideoSingleOutputNode:
         api_key: str = "",
         video_resolution: str = "1080p",
         aspect_ratio: str = "16:9 (横屏宽幅)",
+        automation_payload: str = "",
         unique_id=None,
+        prompt_graph=None,
+        extra_pnginfo=None,
         **kwargs,
     ):
         start = time.time()
         resolved_key = str(api_key or "").strip() or _cfg("api_key", "")
+        automation_payload = _resolve_automation_payload(
+            automation_payload,
+            unique_id=unique_id,
+            prompt=prompt_graph,
+            extra_pnginfo=extra_pnginfo,
+        )
 
         if not resolved_key:
             msg = "请在节点中填入 API Key，或在 config.ini 的 [banana] 下配置 api_key"
             logger.error(msg)
             return _return_video_with_ui_preview(("",), "", label="banana_normal_video_single_error")
+
+        if _automation_enabled(automation_payload):
+            return self.generate_automation(
+                resolved_key=resolved_key,
+                prompt=prompt,
+                video_model=video_model,
+                video_resolution=video_resolution,
+                aspect_ratio=aspect_ratio,
+                automation_payload=automation_payload,
+            )
 
         try:
             image_urls = _upload_reference_images_for_node(kwargs, resolved_key)
@@ -3218,6 +3872,31 @@ class HrioBananaNormalVideoSingleOutputNode:
             return _return_video_with_ui_preview(("",), "", label="banana_normal_video_single_error")
 
 
+    def generate_automation(
+        self,
+        *,
+        resolved_key: str,
+        prompt: str,
+        video_model: str,
+        video_resolution: str = "1080p",
+        aspect_ratio: str = "16:9 (横屏宽幅)",
+        automation_payload: str = "",
+    ):
+        batch = _run_video_automation_batch(
+            resolved_key=resolved_key,
+            prompt=prompt,
+            video_model=video_model,
+            video_resolution=video_resolution,
+            aspect_ratio=aspect_ratio,
+            automation_payload=automation_payload,
+            output_kind="normal_video_single",
+        )
+        if not batch.get("ok"):
+            return _return_video_with_ui_preview(("",), "", label="banana_normal_video_single_automation_error")
+        video_path = str(batch.get("local_video_path") or batch.get("mp4url") or "")
+        return _return_video_with_ui_preview((video_path,), video_path, label="banana_normal_video_single_automation")
+
+
 class HrioBananaPromptVideoNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("info", "video", "mp4url")
@@ -3243,14 +3922,7 @@ class HrioBananaPromptVideoNode:
             default_video_aspect = video_aspect_options[0]
 
         optional = {
-            "automation_payload": (
-                "STRING",
-                {
-                    "default": "",
-                    "multiline": True,
-                    "tooltip": "自动化批处理 JSON；由右下角自动化面板写入，界面会自动隐藏。",
-                },
-            ),
+            "automation_payload": _automation_payload_widget(),
         }
 
         slot_count = int(_NODE.get("optional_image_slots", 10) or 10)
@@ -3305,7 +3977,7 @@ class HrioBananaPromptVideoNode:
                 ),
             },
             "optional": optional,
-            "hidden": {"unique_id": "UNIQUE_ID"},
+            "hidden": {"unique_id": "UNIQUE_ID", "prompt_graph": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
 
     def generate(
@@ -3317,10 +3989,18 @@ class HrioBananaPromptVideoNode:
         aspect_ratio: str = "16:9 (横屏宽幅)",
         automation_payload: str = "",
         unique_id=None,
+        prompt_graph=None,
+        extra_pnginfo=None,
         **kwargs,
     ):
         start = time.time()
         resolved_key = str(api_key or "").strip() or _cfg("api_key", "")
+        automation_payload = _resolve_automation_payload(
+            automation_payload,
+            unique_id=unique_id,
+            prompt=prompt_graph,
+            extra_pnginfo=extra_pnginfo,
+        )
 
         if not resolved_key:
             msg = "请在节点中填入 API Key，或在 config.ini 的 [banana] 下配置 api_key"
@@ -3509,4 +4189,5 @@ __all__ = [
     "_THREE_VIEW_SCOPE_OPTIONS",
     "_runtime_results_payload",
     "_clear_runtime_results",
+    "_resolve_automation_payload",
 ]

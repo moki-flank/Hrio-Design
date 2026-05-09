@@ -1,6 +1,7 @@
 # FILE: banana_triple_view_node.py
 from __future__ import annotations
 
+import base64
 import copy
 import json
 import os
@@ -10,7 +11,8 @@ import time
 import traceback
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List
+from io import BytesIO
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from PIL import Image
@@ -39,6 +41,7 @@ try:
         _THREE_VIEW_SCOPE_OPTIONS,
         _runtime_results_payload,
         _clear_runtime_results,
+        _resolve_automation_payload,
         _error_img,
         _return_images_with_ui_preview,
         _HAS_PROMPT_SERVER,
@@ -49,7 +52,7 @@ except Exception as e:
     raise RuntimeError(f"banana_triple_view_node.py 依赖 banana_node.py，请确认 banana_node.py 已正确安装: {e}") from e
 
 
-PLUGIN_VERSION = "8.1.0"
+PLUGIN_VERSION = "8.1.8"
 
 EDITOR_ROUTE = "/hrio-design/editor"
 MANIFEST_ROUTE = "/hrio-design/manifest"
@@ -525,7 +528,7 @@ def _compose_prompt(mode_actual: str, view_key: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-# 自动化：后端扫描输入根目录 -> 按子文件夹数字序号横向聚合 -> 并发执行不同序号组。
+# 自动化：后端递归扫描输入根目录 -> 按图片文件名或父文件夹数字序号横向聚合 -> 并发执行不同序号组。
 # -----------------------------------------------------------------------------
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -595,53 +598,168 @@ def _clean_sequence_list(values: Any, max_count: int = 9999) -> List[str]:
     return out
 
 
-def _scan_input_root(root: str) -> List[Dict[str, Any]]:
-    """
-    只支持「根目录直放图片模式」。
+AUTOMATION_SCAN_MAX_FILES_PER_ROOT = 5000
+AUTOMATION_SCAN_MAX_DEPTH = 8
+_AUTOMATION_SKIP_DIR_NAMES = {
+    ".git", ".svn", ".hg", "__pycache__", "node_modules", ".venv", "venv", "env",
+    "output", "outputs", "temp", "tmp", "cache", ".cache",
+}
 
-    输入示例：
-        input_root_01/001.png
-        input_root_01/002.png
-        input_root_02/001.png
-        input_root_02/002.png
 
-    扫描规则：
-    - 只扫描 input_root 下的直接图片文件；
-    - 不扫描 001_截图/ 这类子文件夹；
-    - 从图片文件名中贪婪提取所有数字并拼接作为序号；
-    - 相同序号会在多个 input_root 之间横向聚合。
-    """
-    items: List[Dict[str, Any]] = []
-    root = str(root or "").strip()
-    if not root or not os.path.isdir(root):
-        return items
+def _norm_abs_path(path: str) -> str:
+    try:
+        return os.path.normcase(os.path.abspath(os.path.normpath(str(path or "").strip().strip('"'))))
+    except Exception:
+        return str(path or "").strip().strip('"')
+
+
+def _path_is_inside(child: str, parent: str) -> bool:
+    parent = _norm_abs_path(parent)
+    child = _norm_abs_path(child)
+    if not parent or not child:
+        return False
+    try:
+        return os.path.commonpath([child, parent]) == parent
+    except Exception:
+        return child.startswith(parent.rstrip("\\/"))
+
+
+def _relative_depth(root: str, current: str) -> int:
+    try:
+        rel = os.path.relpath(current, root)
+        if rel in {".", ""}:
+            return 0
+        return len([p for p in re.split(r"[\\/]+", rel) if p and p != "."])
+    except Exception:
+        return 0
+
+
+def _sequence_from_image_path(root: str, full_path: str) -> str:
+    """优先用图片文件名数字；文件名没有数字时，回退使用父文件夹数字。"""
+    name = os.path.basename(full_path)
+    stem = os.path.splitext(name)[0]
+    seq = _extract_sequence(stem)
+    if seq:
+        return seq
 
     try:
-        names = sorted(os.listdir(root))
+        rel_dir = os.path.relpath(os.path.dirname(full_path), root)
+        parts = [p for p in re.split(r"[\\/]+", rel_dir) if p and p not in {".", ".."}]
+        for part in reversed(parts):
+            seq = _extract_sequence(part)
+            if seq:
+                return seq
     except Exception:
-        return items
+        pass
 
-    for name in names:
-        full = os.path.join(root, name)
-        if not os.path.isfile(full):
-            continue
+    return ""
 
-        ext = os.path.splitext(name)[1].lower()
-        if ext not in IMAGE_EXTS:
-            continue
 
-        stem = os.path.splitext(name)[0]
-        seq = _extract_sequence(stem)
-        if not seq:
-            continue
+def _scan_input_root_with_report(root: str, output_root: str = "") -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    递归扫描输入项目根目录。
 
-        items.append({
-            "source_type": "root_image",
-            "file_name": name,
-            "image_path": full,
-            "sequence": seq,
-        })
+    支持两种常用放法：
+    1. 直接图片：input_root/001.png、input_root/002.png
+    2. 项目子文件夹：input_root/001/front.png、input_root/001/reference.jpg
 
+    序号规则：优先提取图片文件名里的所有数字；图片文件名没有数字时，提取最近父文件夹里的数字。
+    """
+    items: List[Dict[str, Any]] = []
+    raw_root = str(root or "").strip().strip('"')
+    report: Dict[str, Any] = {
+        "root_path": raw_root,
+        "exists": False,
+        "is_file": False,
+        "is_dir": False,
+        "scanned_file_count": 0,
+        "image_count": 0,
+        "sequence_count": 0,
+        "skipped_no_sequence_count": 0,
+        "skipped_output_count": 0,
+        "max_files_per_root": AUTOMATION_SCAN_MAX_FILES_PER_ROOT,
+        "max_depth": AUTOMATION_SCAN_MAX_DEPTH,
+        "error": "",
+    }
+
+    if not raw_root:
+        report["error"] = "输入路径为空"
+        return items, report
+
+    root_abs = raw_root
+    output_abs = str(output_root or "").strip().strip('"')
+    report["exists"] = os.path.exists(root_abs)
+    report["is_file"] = os.path.isfile(root_abs)
+    report["is_dir"] = os.path.isdir(root_abs)
+
+    def add_image(full: str) -> None:
+        try:
+            report["scanned_file_count"] = int(report.get("scanned_file_count") or 0) + 1
+            if output_abs and _path_is_inside(full, output_abs):
+                report["skipped_output_count"] = int(report.get("skipped_output_count") or 0) + 1
+                return
+            ext = os.path.splitext(full)[1].lower()
+            if ext not in IMAGE_EXTS:
+                return
+            report["image_count"] = int(report.get("image_count") or 0) + 1
+            seq = _sequence_from_image_path(root_abs if os.path.isdir(root_abs) else os.path.dirname(root_abs), full)
+            if not seq:
+                report["skipped_no_sequence_count"] = int(report.get("skipped_no_sequence_count") or 0) + 1
+                return
+            try:
+                rel_path = os.path.relpath(full, root_abs if os.path.isdir(root_abs) else os.path.dirname(root_abs))
+            except Exception:
+                rel_path = os.path.basename(full)
+            items.append({
+                "source_type": "root_image_recursive",
+                "file_name": os.path.basename(full),
+                "relative_path": rel_path,
+                "image_path": full,
+                "sequence": seq,
+            })
+        except Exception as e:
+            report["error"] = str(e)[:220]
+
+    if os.path.isfile(root_abs):
+        add_image(root_abs)
+        report["sequence_count"] = len({str(x.get("sequence") or "") for x in items if x.get("sequence")})
+        return items, report
+
+    if not os.path.isdir(root_abs):
+        report["error"] = "目录不存在或不可访问"
+        return items, report
+
+    try:
+        for current, dirs, files in os.walk(root_abs):
+            depth = _relative_depth(root_abs, current)
+            # 原地过滤，避免进入输出目录、缓存目录和过深目录。
+            kept_dirs = []
+            for d in sorted(dirs):
+                d_low = d.lower()
+                full_dir = os.path.join(current, d)
+                if depth >= AUTOMATION_SCAN_MAX_DEPTH:
+                    continue
+                if d_low in _AUTOMATION_SKIP_DIR_NAMES or d_low.startswith("output_") or d_low.startswith("run_"):
+                    continue
+                if output_abs and _path_is_inside(full_dir, output_abs):
+                    continue
+                kept_dirs.append(d)
+            dirs[:] = kept_dirs
+
+            for name in sorted(files):
+                if int(report.get("scanned_file_count") or 0) >= AUTOMATION_SCAN_MAX_FILES_PER_ROOT:
+                    report["error"] = f"扫描文件数超过上限 {AUTOMATION_SCAN_MAX_FILES_PER_ROOT}，已截断"
+                    break
+                add_image(os.path.join(current, name))
+    except Exception as e:
+        report["error"] = str(e)[:220]
+
+    report["sequence_count"] = len({str(x.get("sequence") or "") for x in items if x.get("sequence")})
+    return items, report
+
+
+def _scan_input_root(root: str, output_root: str = "") -> List[Dict[str, Any]]:
+    items, _report = _scan_input_root_with_report(root, output_root=output_root)
     return items
 
 
@@ -653,28 +771,29 @@ def _sequence_sort_key(seq: str):
         return (1, 0, len(text), text)
 
 
-def _build_sequence_groups(input_roots: List[str], output_root: str = "", require_all_roots_present: bool = False) -> List[Dict[str, Any]]:
+def _build_sequence_groups(input_roots: List[str], output_root: str = "", require_all_roots_present: bool = False, return_reports: bool = False):
     """
-    只按根目录图片文件名分组。
+    按序号聚合输入图片。
 
-    每个 input_root 是一个输入槽位；执行时每个序号组最多从 10 个 input_root 中各取一张同序号图片，
-    例如 001 组会收集：
-        input_root_01/001.png
-        input_root_02/001.png
-        ...
-        input_root_10/001.png
+    每个 input_root 是一个输入槽位；可以直接放 001.png，也可以用 001/front.png 这类项目子文件夹。
+    相同序号会在多个 input_root 之间横向聚合；同一 root 同一序号下允许有多张参考图。
     """
     group_map: Dict[str, List[Dict[str, Any]]] = {}
     root_count = len(input_roots)
+    scan_reports: List[Dict[str, Any]] = []
 
     for root_index, root in enumerate(input_roots):
-        for item in _scan_input_root(root):
+        scanned_items, report = _scan_input_root_with_report(root, output_root=output_root)
+        report["root_index"] = root_index
+        scan_reports.append(report)
+        for item in scanned_items:
             seq = item["sequence"]
             group_map.setdefault(seq, []).append({
                 "root_index": root_index,
                 "root_path": root,
-                "source_type": "root_image",
-                "file_name": item["file_name"],
+                "source_type": item.get("source_type") or "root_image_recursive",
+                "file_name": item.get("file_name") or os.path.basename(str(item.get("image_path") or "")),
+                "relative_path": item.get("relative_path") or item.get("file_name") or "",
                 "image_path": item["image_path"],
                 "sequence": seq,
             })
@@ -693,6 +812,8 @@ def _build_sequence_groups(input_roots: List[str], output_root: str = "", requir
             "present_root_count": len(present_roots),
             "expected_root_count": root_count,
         })
+    if return_reports:
+        return groups, scan_reports
     return groups
 
 
@@ -709,6 +830,64 @@ def _collect_images_for_group(items: List[Dict[str, Any]], max_count: int = 10) 
             if len(paths) >= max_count:
                 return paths
     return paths[:max_count]
+
+
+def _image_file_preview_payload(path: str, max_edge: int = 180) -> Dict[str, Any]:
+    """把本地输入图转换成轻量 data URL 缩略图，供自动化分组预览面板直接显示。"""
+    out: Dict[str, Any] = {
+        "thumb_data_url": "",
+        "preview_data_url": "",
+        "preview_error": "",
+        "width": 0,
+        "height": 0,
+        "file_size": 0,
+    }
+
+    try:
+        path = str(path or "").strip()
+        if not path or not os.path.isfile(path):
+            out["preview_error"] = "图片不存在"
+            return out
+
+        out["file_size"] = int(os.path.getsize(path) or 0)
+        with Image.open(path) as img:
+            img = img.convert("RGB")
+            out["width"], out["height"] = img.size
+            img.thumbnail((int(max_edge), int(max_edge)), Image.LANCZOS)
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=76, optimize=True)
+
+        data_url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+        out["thumb_data_url"] = data_url
+        out["preview_data_url"] = data_url
+        return out
+    except Exception as e:
+        out["preview_error"] = str(e)[:220]
+        return out
+
+
+def _attach_automation_group_previews(groups: List[Dict[str, Any]], max_images_per_group: int = 10) -> List[Dict[str, Any]]:
+    """给每个序号组附加 preview_items，不改变真实执行时的 image_path 读取逻辑。"""
+    max_images = _safe_int_local(max_images_per_group, 10, 1, 10)
+    preview_groups: List[Dict[str, Any]] = []
+
+    for group in groups or []:
+        g = copy.deepcopy(group)
+        raw_items = sorted(g.get("items") or [], key=lambda x: int(x.get("root_index") or 0))
+        preview_items: List[Dict[str, Any]] = []
+
+        for item in raw_items[:max_images]:
+            preview_item = copy.deepcopy(item)
+            preview_item.update(_image_file_preview_payload(str(item.get("image_path") or "")))
+            preview_items.append(preview_item)
+
+        g["preview_items"] = preview_items
+        g["preview_count"] = len(preview_items)
+        g["preview_max_images"] = max_images
+        preview_groups.append(g)
+
+    return preview_groups
+
 
 def _automation_payload_from_string(raw: Any) -> Dict[str, Any]:
     if isinstance(raw, dict):
@@ -777,18 +956,37 @@ def _automation_preview(payload: Dict[str, Any]) -> Dict[str, Any]:
     cfg = _normalize_automation_payload(payload)
     input_roots = cfg["input_roots"]
     output_root = cfg["output_root"]
-    groups = _build_sequence_groups(
+    groups, scan_reports = _build_sequence_groups(
         input_roots,
         output_root=output_root,
         require_all_roots_present=bool(cfg.get("require_all_roots_present")),
+        return_reports=True,
     )
+    preview_groups = _attach_automation_group_previews(
+        groups,
+        max_images_per_group=int(cfg.get("max_images_per_group") or 10),
+    )
+
+    scanned_files = sum(int(r.get("scanned_file_count") or 0) for r in scan_reports)
+    scanned_images = sum(int(r.get("image_count") or 0) for r in scan_reports)
+    skipped_no_seq = sum(int(r.get("skipped_no_sequence_count") or 0) for r in scan_reports)
 
     return {
         "ok": True,
         "input_roots": input_roots,
         "output_root": output_root,
-        "group_count": len(groups),
-        "groups": groups,
+        "group_count": len(preview_groups),
+        "groups": preview_groups,
+        "scan_reports": scan_reports,
+        "scan_summary": {
+            "root_count": len(input_roots),
+            "scanned_file_count": scanned_files,
+            "image_count": scanned_images,
+            "group_count": len(preview_groups),
+            "skipped_no_sequence_count": skipped_no_seq,
+            "recursive": True,
+            "sequence_rule": "优先图片文件名数字；没有数字时使用最近父文件夹数字",
+        },
     }
 
 
@@ -1349,14 +1547,6 @@ class BananaPanelThreeViewNode:
                     "tooltip": "可选输出标题前缀；留空自动使用模板名。",
                 },
             ),
-            "automation_payload": (
-                "STRING",
-                {
-                    "default": "",
-                    "multiline": True,
-                    "tooltip": "自动化文件夹映射 JSON。由右下角自动化面板写入；不影响普通单次生成。",
-                },
-            ),
         }
 
         slot_count = int(cfg.get("optional_image_slots") or _NODE.get("optional_image_slots", 10) or 10)
@@ -1371,7 +1561,7 @@ class BananaPanelThreeViewNode:
         return {
             "required": required,
             "optional": optional,
-            "hidden": {"unique_id": "UNIQUE_ID"},
+            "hidden": {"unique_id": "UNIQUE_ID", "prompt_graph": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
 
     def generate(
@@ -1390,10 +1580,18 @@ class BananaPanelThreeViewNode:
         labels_prefix: str = "",
         automation_payload: str = "",
         unique_id=None,
+        prompt_graph=None,
+        extra_pnginfo=None,
         **kwargs,
     ):
         start = time.time()
         resolved_key = str(api_key or "").strip() or _cfg("api_key", "")
+        automation_payload = _resolve_automation_payload(
+            automation_payload,
+            unique_id=unique_id,
+            prompt=prompt_graph,
+            extra_pnginfo=extra_pnginfo,
+        )
 
         if not resolved_key:
             msg = "请在节点中填入 API Key"
@@ -1661,7 +1859,7 @@ class BananaPanelThreeViewNode:
             f"group_concurrency: {group_concurrency}",
             f"max_images_per_group: {cfg.get('max_images_per_group')}",
             f"output_root: {cfg['output_root']}",
-            "输入规则: 只扫描输入根目录下的直接图片文件，例如 input_root_01/001.png；输出目录规则: output_序号/run_01/，图片文件 front.png / side.png / back.png",
+            "输入规则: 递归扫描输入根目录及子文件夹，例如 input_root_01/001.png 或 input_root_01/001/front.png；输出目录规则: output_序号/run_01/，图片文件 front.png / side.png / back.png",
         ]
 
         if cfg.get("save_video"):

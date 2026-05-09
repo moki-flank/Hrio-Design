@@ -1,6 +1,6 @@
 [project]
 name = "hrio-design"
-version = "8.1.6"
+version = "8.2.0"
 description = "Independent Hrio Design custom nodes for ComfyUI. Graphic design and interior design prompt editor, single image node, single video node, and three-variant design generation."
 license = { text = "Proprietary" }
 requires-python = ">=3.10"

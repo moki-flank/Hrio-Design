@@ -14,7 +14,7 @@ Hrio Design 是独立的 ComfyUI 自定义节点插件，面向平面设计与�
 
 - GitHub 仓库：`git@github.com:moki-flank/Hrio-Design.git`
 - Comfy Registry 包名：`hrio-design`
-- 版本：`8.1.4`
+- 版本：`8.1.8`
 
 ## 一键推送
 
