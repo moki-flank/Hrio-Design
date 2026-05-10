@@ -69,8 +69,12 @@ _DL_TIMEOUT = 120
 _QUICK_FAILOVER_WINDOW_SEC = 5.0
 _DEFAULT_FALLBACK_BASE_URL = "https://zheshihouduan.tenx-jingli.cloud/api"
 AUTOMATION_HISTORY_FILE = "banana_automation_history.json"
+RUNTIME_RESULTS_FILE = "banana_runtime_results.json"
 _AUTOMATION_HISTORY_LOCK = threading.Lock()
+_RUNTIME_RESULTS_LOCK = threading.Lock()
 _AUTOMATION_HISTORY_MAX_ITEMS = 500
+_RUNTIME_RESULTS_MAX_GROUPS = 500
+_RUNTIME_RESULTS_MAX_VIDEOS = 200
 
 _MEDIA_URL_RE = re.compile(
     r"https?://[^\s\"'<>]+?\.(?:png|jpg|jpeg|webp|gif|bmp)(?:\?[^\s\"'<>]*)?",
@@ -1179,7 +1183,7 @@ def _resolve_retry_options(values: Dict[str, Any]) -> Tuple[bool, int, float]:
     return auto_retry, max_retry, retry_interval
 
 
-def _tensor_to_preview_data_url(tensor: torch.Tensor, max_edge: int = 900) -> str:
+def _tensor_to_preview_data_url(tensor: torch.Tensor, max_edge: int = 360) -> str:
     try:
         t = tensor.detach().cpu()
         if t.ndim == 4:
@@ -1225,26 +1229,35 @@ def _tensor_frame_to_pil(frame: torch.Tensor) -> Image.Image:
     return Image.fromarray(arr).convert("RGB")
 
 
-def _save_tensors_for_comfyui_preview(tensors: List[Any], label: str = "banana") -> List[Dict[str, str]]:
+def _save_tensors_for_comfyui_preview(
+    tensors: List[Any], label: str = "banana"
+) -> List[Dict[str, str]]:
     """
-    保存临时预览图，返回 ComfyUI 前端能识别的 ui.images 结构。
-    这样节点本身面板能直接显示图片，同时 result 仍保留 IMAGE 张量给 Preview Image 节点继续预览。
+    v8.2.4：把图片写到 ComfyUI output 目录（而非 temp），
+    type="output" → 左侧「已生成」媒体资产面板可见。
+ 
+    注意：此函数现在只负责把文件落盘到 output 目录并返回引用；
+    _return_images_with_ui_preview 会决定是否把这些引用放进 ui.images。
+    自动化模式下 ui.images 仍然填充所有图片（全部进媒体资产），
+    但节点底部预览通过 _return_images_with_ui_preview 里的逻辑控制不显示。
     """
     results: List[Dict[str, str]] = []
     try:
         import folder_paths  # type: ignore
-        output_dir = folder_paths.get_temp_directory()
-        subfolder = ""
-        image_type = "temp"
+        # 写到 output 目录下的 hrio_design 子目录，避免和其他节点混
+        base_output = folder_paths.get_output_directory()
+        output_dir = os.path.join(base_output, "hrio_design")
+        subfolder = "hrio_design"
+        image_type = "output"
     except Exception:
-        output_dir = os.path.join(MODULE_DIR, "banana_temp_previews")
+        output_dir = os.path.join(MODULE_DIR, "hrio_design_outputs")
         subfolder = ""
-        image_type = "temp"
-
+        image_type = "output"
+ 
     os.makedirs(output_dir, exist_ok=True)
     safe_label = re.sub(r"[^a-zA-Z0-9_\-]+", "_", str(label or "banana"))[:48] or "banana"
     prefix = f"{safe_label}_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
-
+ 
     index = 0
     for tensor in tensors or []:
         for frame in _iter_preview_frames(tensor):
@@ -1253,24 +1266,64 @@ def _save_tensors_for_comfyui_preview(tensors: List[Any], label: str = "banana")
                 filename = f"{prefix}_{index:02d}.png"
                 path = os.path.join(output_dir, filename)
                 _tensor_frame_to_pil(frame).save(path, format="PNG", compress_level=1)
-                results.append({"filename": filename, "subfolder": subfolder, "type": image_type})
+                results.append({
+                    "filename": filename,
+                    "subfolder": subfolder,
+                    "type": image_type,
+                })
             except Exception as e:
-                logger.warning(f"ComfyUI 临时预览图保存失败，已跳过一帧: {e}")
-
+                logger.warning(f"ComfyUI output 图片保存失败，已跳过一帧: {e}")
+ 
     return results
-
-
-def _return_images_with_ui_preview(result_tuple: Tuple[Any, ...], label: str = "banana") -> Dict[str, Any] | Tuple[Any, ...]:
-    try:
-        preview_tensors = [x for x in list(result_tuple[:3]) if x is not None]
-        ui_images = _save_tensors_for_comfyui_preview(preview_tensors, label=label)
-        if ui_images:
-            return {"ui": {"images": ui_images}, "result": tuple(result_tuple)}
-    except Exception as e:
-        logger.warning(f"ComfyUI ui.images 预览输出失败，继续返回 IMAGE 张量: {e}")
-    return tuple(result_tuple)
-
-
+ 
+def _return_images_with_ui_preview(
+    result_tuple: tuple,
+    label: str = "banana",
+    *,
+    extra_output_paths: List[str] | None = None,  # 自动化时传入全部已保存图片的磁盘路径
+) -> dict:
+    """
+    v8.2.4：
+    - OUTPUT_NODE = True 必须返回 {"ui": {...}, "result": (...)}，否则 ComfyUI 卡死。
+    - ui.images type="output" → 进左侧媒体资产面板。
+    - 节点底部预览：返回空 images 列表，彻底不显示节点底部缩略图。
+      媒体资产面板靠 extra_output_paths 里已落盘到 output 目录的文件引用来入库。
+    - 自动化模式：调用方把全部序号的输出路径放进 extra_output_paths，
+      全部进媒体资产面板；result 元组只携带最后一张张量供下游节点使用。
+    """
+    # ── 1. 节点底部预览：永远返回空，彻底去掉节点底部图片预览 ──────────────
+    ui_images: List[Dict[str, str]] = []
+ 
+    # ── 2. 把已保存到 output 目录的文件注册进媒体资产 ─────────────────────
+    #    extra_output_paths 是自动化完成后每组 _save_tensor_image 写出的路径列表
+    if extra_output_paths:
+        for path in extra_output_paths:
+            try:
+                ref = _comfyui_media_ref_from_path(path)
+                if ref.get("filename") and ref.get("type") == "output":
+                    ui_images.append({
+                        "filename": ref["filename"],
+                        "subfolder": str(ref.get("subfolder") or ""),
+                        "type": "output",
+                    })
+            except Exception as _e:
+                logger.warning(f"[_return_images_with_ui_preview] 路径注册失败: {path} | {_e}")
+ 
+    # ── 3. 非自动化（手动单次）：把 result_tuple 里的张量保存到 output 目录 ─
+    if not extra_output_paths:
+        tensors = [t for t in result_tuple if isinstance(t, __import__("torch").Tensor)]
+        if tensors:
+            try:
+                saved = _save_tensors_for_comfyui_preview(tensors, label=label)
+                # 仍然不放进 ui_images，节点底部不显示；但文件已落到 output 目录
+                # 让 ComfyUI 的文件扫描机制自然发现（output 目录会被定期扫描）
+                # 如果想让它立刻进媒体资产，取消下面注释：
+                # ui_images.extend(saved)
+                _ = saved  # 文件落盘，媒体资产下次刷新时自动扫描到
+            except Exception as _e:
+                logger.warning(f"[_return_images_with_ui_preview] 张量保存失败: {_e}")
+ 
+    return {"ui": {"images": ui_images}, "result": tuple(result_tuple)}
 
 def _guess_video_ext_from_value(value: Any, default_ext: str = ".mp4") -> str:
     text = str(value or "").strip().lower()
@@ -1347,31 +1400,501 @@ def _save_video_for_comfyui_preview(video_url_or_path: Any, label: str = "banana
 
 
 
-def _return_video_with_ui_preview(result_tuple: Tuple[Any, ...], video_url_or_path: Any, label: str = "banana_video") -> Dict[str, Any] | Tuple[Any, ...]:
+def _return_video_with_ui_preview(
+    result_tuple: tuple,
+    video_url_or_path,
+    label: str = "banana_video",
+) -> dict:
+    """
+    v8.2.3 修复：同 _return_images_with_ui_preview，必须返回
+        {"ui": {...}, "result": (...)}
+    否则视频节点执行后 ComfyUI 仍不认为任务完成，导致全局卡死。
+    """
+    ui_videos: list = []
     try:
-        ui_videos, local_path = _save_video_for_comfyui_preview(video_url_or_path, label=label)
+        saved_videos, local_path = _save_video_for_comfyui_preview(
+            video_url_or_path, label=label
+        )
         if local_path:
             result_list = list(result_tuple)
-            # 兼容两类输出：
-            # 1. 老视频节点: (info, video, mp4url) -> video 输出本地可预览路径；
-            # 2. 新普通单输出视频节点: (video,) -> 唯一输出直接给本地可预览路径。
             if len(result_list) == 1:
                 result_list[0] = local_path
             elif len(result_list) >= 2:
                 result_list[1] = local_path
             result_tuple = tuple(result_list)
-        if ui_videos:
+        if saved_videos:
+            ui_videos = saved_videos
             _publish_video_runtime_result(
                 label=label,
                 source=video_url_or_path,
-                ui_videos=ui_videos,
+                ui_videos=saved_videos,
                 local_path=local_path,
             )
-            return {"ui": {"videos": ui_videos}, "result": tuple(result_tuple)}
-    except Exception as e:
-        logger.warning(f"ComfyUI ui.videos 预览输出失败，继续返回原始结果: {e}")
-    return tuple(result_tuple)
+    except Exception as _e:
+        logger.warning(
+            f"[_return_video_with_ui_preview] 视频本地化/运行期记录失败，继续: {_e}"
+        )
+ 
+    return {"ui": {"videos": ui_videos}, "result": tuple(result_tuple)}
 
+def _runtime_results_path() -> str:
+    return os.path.join(MODULE_DIR, RUNTIME_RESULTS_FILE)
+
+
+def _runtime_now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def _runtime_sort_value(item: Dict[str, Any]) -> float:
+    try:
+        value = item.get("updated_at_ms") or item.get("created_at_ms") or item.get("updated_at") or item.get("created_at") or 0
+        if isinstance(value, str) and value.strip().isdigit():
+            value = float(value.strip())
+        if isinstance(value, (int, float)):
+            value = float(value)
+            return value if value > 10000000000 else value * 1000
+    except Exception:
+        pass
+    return 0.0
+
+
+def _runtime_sanitize_part(value: Any, fallback: str = "item") -> str:
+    raw = str(value or fallback).strip()
+    raw = re.sub(r"[^a-zA-Z0-9_\-\.]+", "_", raw)
+    return raw[:80] or fallback
+
+
+def _runtime_cache_output_root() -> str:
+    candidates: List[str] = []
+    try:
+        import folder_paths  # type: ignore
+        out = folder_paths.get_output_directory()
+        if out:
+            candidates.append(os.path.join(str(out), "hrio_design_runtime_cache"))
+    except Exception:
+        pass
+    candidates.append(os.path.join(MODULE_DIR, "hrio_design_runtime_cache"))
+    for path in candidates:
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            continue
+    return os.path.join(MODULE_DIR, "hrio_design_runtime_cache")
+
+
+def _save_runtime_tensor_media(tensor: Any, group_key: Any, slot: str) -> Dict[str, Any]:
+    """保存运行期结果到 output/hrio_design_runtime_cache，并返回 /view 引用。
+
+    这里不再把大体积 base64 写进 JSON；设计师面板、最近生成和历史记录都只读轻量 URL。
+    """
+    if tensor is None:
+        return {}
+    try:
+        root = _runtime_cache_output_root()
+        safe_group = _runtime_sanitize_part(group_key, "runtime")
+        safe_slot = _runtime_sanitize_part(slot, "image")
+        run_dir = os.path.join(root, safe_group)
+        os.makedirs(run_dir, exist_ok=True)
+        path = os.path.join(run_dir, f"{safe_slot}.png")
+        _save_tensor_image(tensor, path)
+        ref = _comfyui_media_ref_from_path(path)
+        if not ref:
+            ref = {"path": path, "name": os.path.basename(path), "kind": "image"}
+        ref.setdefault("slot", f"{safe_slot}.png")
+        ref.setdefault("local_path", path)
+        return ref
+    except Exception as e:
+        try:
+            logger.warning(f"Hrio Design 运行期图片 JSON 缓存保存失败: {e}")
+        except Exception:
+            pass
+        return {}
+
+
+def _runtime_media_url(ref: Dict[str, Any]) -> str:
+    if not isinstance(ref, dict):
+        return ""
+    return str(
+        ref.get("url")
+        or ref.get("view_url")
+        or ref.get("public_url")
+        or ref.get("publicUrl")
+        or ref.get("oss_url")
+        or ref.get("ossUrl")
+        or ref.get("mp4url")
+        or ""
+    ).strip()
+
+
+def _runtime_view_payload(
+    *,
+    view_key: str,
+    label: str,
+    status: str = "success",
+    url: str = "",
+    error: str = "",
+    info: str = "",
+    media_ref: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    failed = bool(error) or str(status).lower() in {"failed", "fail", "error"}
+    missing = not failed and not str(url or "").strip()
+    normalized_status = "failed" if failed else ("missing" if missing else (status or "success"))
+    return {
+        "view": view_key,
+        "label": label,
+        "status": normalized_status,
+        "failed": failed,
+        "placeholder": missing,
+        "from_cache": False,
+        "from_json_cache": True,
+        "needs_regenerate": failed or missing,
+        "seed": "",
+        "attempt": "",
+        "max_retry": "",
+        "elapsed": 0.0,
+        "info": info or error or ("JSON 缓存结果" if url else "暂无图片"),
+        "error": error if failed else "",
+        "image": url,
+        "url": url,
+        "view_url": url,
+        "media": media_ref or {},
+    }
+
+
+def _runtime_alias_views(base_views: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    out = dict(base_views or {})
+    alias_map = {
+        "front": ("variant_a", "方案 A"),
+        "side": ("variant_b", "方案 B"),
+        "back": ("variant_c", "方案 C"),
+    }
+    for src, (alias, label) in alias_map.items():
+        if src in out and alias not in out:
+            item = dict(out[src])
+            item["view"] = alias
+            item["label"] = label
+            out[alias] = item
+    return out
+
+
+def _history_item_to_runtime_group(item: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    node_type = str(item.get("node_type") or item.get("type") or "").strip()
+    if node_type == "video":
+        return None
+    ok = item.get("ok") is not False
+    err = "" if ok else str(item.get("error") or "未知错误")
+    media_list = item.get("media") if isinstance(item.get("media"), list) else []
+    by_slot: Dict[str, Dict[str, Any]] = {}
+    for ref in media_list:
+        if not isinstance(ref, dict):
+            continue
+        slot = str(ref.get("slot") or ref.get("filename") or ref.get("name") or "").strip()
+        if slot:
+            by_slot[slot] = ref
+    def _first_ref(names: List[str]) -> Dict[str, Any]:
+        for name in names:
+            if by_slot.get(name):
+                return by_slot[name]
+        for ref in media_list:
+            name = str((ref or {}).get("slot") or (ref or {}).get("filename") or (ref or {}).get("name") or "").lower()
+            if any(name.endswith(x.lower()) for x in names):
+                return ref
+        return {}
+
+    views: Dict[str, Dict[str, Any]] = {}
+    if node_type == "normal_three_view":
+        for view_key, label, names in [
+            ("front", "正面图", ["front.png"]),
+            ("side", "侧面图", ["side.png"]),
+            ("back", "背面图", ["back.png"]),
+        ]:
+            ref = _first_ref(names)
+            url = _runtime_media_url(ref)
+            views[view_key] = _runtime_view_payload(
+                view_key=view_key,
+                label=label,
+                status="success" if ok and url else ("failed" if err else "missing"),
+                url=url,
+                error=err,
+                info="统一运行结果 JSON 缓存",
+                media_ref=ref,
+            )
+        views = _runtime_alias_views(views)
+        visible_variants = ["variant_a", "variant_b", "variant_c"]
+    else:
+        ref = _first_ref(["single.png", "single_image.png", "result.png", "front.png"])
+        if not ref and item.get("local_image_path"):
+            ref = _comfyui_media_ref_from_path(item.get("local_image_path"))
+        url = _runtime_media_url(ref)
+        front_payload = _runtime_view_payload(
+            view_key="front",
+            label="单图结果",
+            status="success" if ok and url else ("failed" if err else "missing"),
+            url=url,
+            error=err,
+            info="统一运行结果 JSON 缓存（单图）",
+            media_ref=ref,
+        )
+        views["front"] = front_payload
+        alias_payload = dict(front_payload)
+        alias_payload["view"] = "variant_a"
+        alias_payload["label"] = "单图结果"
+        views["variant_a"] = alias_payload
+        visible_variants = ["variant_a"]
+    updated_ms = int(item.get("created_at_ms") or item.get("updated_at_ms") or _runtime_now_ms())
+    key = str(item.get("run_id") or f"history:{node_type}:{item.get('sequence') or ''}:{updated_ms}")
+    group = {
+        "cache_key": key,
+        "run_id": item.get("run_id") or key,
+        "sequence": str(item.get("sequence") or ""),
+        "from_history": True,
+        "from_json_cache": True,
+        "node_type": node_type or "normal_single_image",
+        "mode_actual": str(item.get("mode_key") or item.get("template_key") or ""),
+        "mode_key": str(item.get("mode_key") or item.get("template_key") or ""),
+        "template_key": str(item.get("template_key") or item.get("mode_key") or ""),
+        "template_display": str(item.get("labels") or item.get("template_display") or item.get("mode_display") or ("普通单图" if node_type != "normal_three_view" else "三方案并发")),
+        "mode_display": str(item.get("labels") or item.get("template_display") or item.get("mode_display") or ""),
+        "labels_prefix": str(item.get("labels") or ""),
+        "output_strategy": "three_variants" if node_type == "normal_three_view" else "single_image",
+        "visible_variants": visible_variants,
+        "model": str(item.get("display_model") or item.get("model") or ""),
+        "image_size": str(item.get("image_size") or ""),
+        "aspect_ratio": str(item.get("aspect_ratio") or ""),
+        "generate_scope": str(item.get("generate_scope") or "自动化"),
+        "updated_at": updated_ms / 1000.0,
+        "updated_at_ms": updated_ms,
+        "created_at": item.get("created_at") or "",
+        "created_at_ms": updated_ms,
+        "has_error": (not ok) or any(bool(v.get("needs_regenerate")) for v in views.values()),
+        "input_image_count": int(item.get("input_image_count") or 0),
+        "uploaded_image_count": int(item.get("uploaded_image_count") or 0),
+        "output_dir": str(item.get("output_dir") or ""),
+        "source_images": item.get("source_images") or [],
+        "views": views,
+    }
+    return group
+
+
+def _history_item_to_runtime_video(item: Dict[str, Any]) -> Dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    node_type = str(item.get("node_type") or item.get("type") or "").strip()
+    if node_type != "video" and not (item.get("mp4url") or item.get("local_video_path")):
+        return None
+    media_list = item.get("media") if isinstance(item.get("media"), list) else []
+    ref = {}
+    for m in media_list:
+        if not isinstance(m, dict):
+            continue
+        kind = str(m.get("kind") or "").lower()
+        slot = str(m.get("slot") or m.get("filename") or m.get("name") or "").lower()
+        if kind == "video" or slot.endswith((".mp4", ".mov", ".webm", ".m4v")):
+            ref = m
+            break
+    if not ref and item.get("local_video_path"):
+        ref = _comfyui_media_ref_from_path(item.get("local_video_path"))
+    url = _runtime_media_url(ref) or str(item.get("mp4url") or item.get("local_video_path") or "")
+    if not url and item.get("ok") is not False:
+        return None
+    updated_ms = int(item.get("created_at_ms") or item.get("updated_at_ms") or _runtime_now_ms())
+    key = str(item.get("run_id") or f"video:{item.get('sequence') or ''}:{updated_ms}")
+    return {
+        "key": key,
+        "run_id": item.get("run_id") or key,
+        "label": f"视频自动化 · 序号 {item.get('sequence') or '-'}",
+        "sequence": str(item.get("sequence") or ""),
+        "from_history": True,
+        "from_json_cache": True,
+        "updated_at": updated_ms / 1000.0,
+        "updated_at_ms": updated_ms,
+        "filename": str(ref.get("filename") or ref.get("name") or os.path.basename(str(item.get("local_video_path") or item.get("mp4url") or ""))),
+        "subfolder": str(ref.get("subfolder") or ""),
+        "type": str(ref.get("type") or "output"),
+        "format": str(ref.get("format") or ref.get("mime") or _guess_video_mime_from_value(url)),
+        "mime": str(ref.get("mime") or ref.get("format") or _guess_video_mime_from_value(url)),
+        "view_url": url,
+        "url": url,
+        "source_url": str(item.get("mp4url") or ""),
+        "local_path": str(item.get("local_video_path") or ""),
+        "output_dir": str(item.get("output_dir") or ""),
+        "model": str(item.get("display_model") or item.get("model") or ""),
+        "has_error": item.get("ok") is False,
+        "error": str(item.get("error") or ""),
+    }
+
+
+def _read_runtime_results_file() -> Dict[str, Any]:
+    path = _runtime_results_path()
+    if not os.path.exists(path):
+        return {"ok": True, "version": "8.2.3", "updated_at_ms": 0, "count": 0, "video_count": 0, "groups": [], "videos": []}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {"ok": True, "version": "8.2.3", "updated_at_ms": 0, "count": 0, "video_count": 0, "groups": [], "videos": []}
+    if not isinstance(data, dict):
+        data = {}
+    groups = data.get("groups") if isinstance(data.get("groups"), list) else []
+    videos = data.get("videos") if isinstance(data.get("videos"), list) else []
+    return {
+        "ok": True,
+        "version": str(data.get("version") or "8.2.2"),
+        "latest_key": str(data.get("latest_key") or ""),
+        "latest_video_key": str(data.get("latest_video_key") or ""),
+        "updated_at_ms": int(data.get("updated_at_ms") or 0),
+        "count": len(groups),
+        "video_count": len(videos),
+        "groups": groups[-_RUNTIME_RESULTS_MAX_GROUPS:],
+        "videos": videos[-_RUNTIME_RESULTS_MAX_VIDEOS:],
+    }
+
+
+def _write_runtime_results_file(payload: Dict[str, Any]) -> None:
+    path = _runtime_results_path()
+    tmp = path + ".tmp"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def _dedupe_runtime_items(items: List[Dict[str, Any]], key_names: Tuple[str, ...], limit: int) -> List[Dict[str, Any]]:
+    """
+    去重 + 影子记录合并。
+
+    规则：
+    1. 主键去重（cache_key / run_id / key）。
+    2. 影子记录去重：同 sequence + 同 node_type + 10 分钟内，
+       如果已存在带 output_dir 的完整记录，则丢弃没有 output_dir 的快速记录。
+       避免 _publish_runtime_result 和 _append_automation_history_record 各写一条
+       导致历史面板出现两条相同序号的结果。
+    """
+    # 先按时间降序排列
+    sorted_items = sorted(
+        [x for x in items if isinstance(x, dict)],
+        key=_runtime_sort_value,
+        reverse=True,
+    )
+
+    # 第一轮：主键去重，保留时间最新的
+    primary_seen: set = set()
+    primary_out: List[Dict[str, Any]] = []
+    for item in sorted_items:
+        key = ""
+        for name in key_names:
+            if item.get(name):
+                key = str(item.get(name))
+                break
+        if not key:
+            key = json.dumps({"t": _runtime_sort_value(item), "n": len(primary_out)}, ensure_ascii=False)
+        if key in primary_seen:
+            continue
+        primary_seen.add(key)
+        primary_out.append(item)
+
+    # 第二轮：影子记录去重
+    # 同 sequence + 同 node_type + 10 分钟内 → 优先保留有 output_dir 的完整记录
+    _10_MIN_MS = 10 * 60 * 1000
+    shadow_out: List[Dict[str, Any]] = []
+    # 记录已确认保留的 (sequence, node_type) 完整记录的时间戳
+    confirmed: Dict[tuple, float] = {}  # (seq, node_type) -> max_ts_ms (有 output_dir 的)
+
+    # 先扫一遍，记录所有有 output_dir 的完整记录
+    for item in primary_out:
+        seq = str(item.get("sequence") or "").strip()
+        nt = str(item.get("node_type") or "").strip()
+        out_dir = str(item.get("output_dir") or "").strip()
+        ts = _runtime_sort_value(item)
+        if seq and nt and out_dir:
+            k = (seq, nt)
+            if k not in confirmed or ts > confirmed[k]:
+                confirmed[k] = ts
+
+    # 再过滤：丢弃"影子记录"（同 seq+nt、时间接近、无 output_dir）
+    for item in primary_out:
+        seq = str(item.get("sequence") or "").strip()
+        nt = str(item.get("node_type") or "").strip()
+        out_dir = str(item.get("output_dir") or "").strip()
+        ts = _runtime_sort_value(item)
+
+        if seq and nt and not out_dir:
+            k = (seq, nt)
+            if k in confirmed and abs(confirmed[k] - ts) <= _10_MIN_MS:
+                # 这是影子快速记录，丢弃
+                continue
+
+        shadow_out.append(item)
+        if len(shadow_out) >= limit:
+            break
+
+    return shadow_out
+
+def _runtime_file_upsert(groups: List[Dict[str, Any]] | None = None, videos: List[Dict[str, Any]] | None = None) -> None:
+    try:
+        with _RUNTIME_RESULTS_LOCK:
+            current = _read_runtime_results_file()
+            merged_groups = _dedupe_runtime_items(list(groups or []) + list(current.get("groups") or []), ("cache_key", "run_id"), _RUNTIME_RESULTS_MAX_GROUPS)
+            merged_videos = _dedupe_runtime_items(list(videos or []) + list(current.get("videos") or []), ("key", "run_id"), _RUNTIME_RESULTS_MAX_VIDEOS)
+            payload = {
+                "ok": True,
+                "version": "8.2.3",
+                "updated_at_ms": _runtime_now_ms(),
+                "latest_key": str((merged_groups[0] or {}).get("cache_key") or "") if merged_groups else "",
+                "latest_video_key": str((merged_videos[0] or {}).get("key") or "") if merged_videos else "",
+                "count": len(merged_groups),
+                "video_count": len(merged_videos),
+                "groups": merged_groups,
+                "videos": merged_videos,
+            }
+            _write_runtime_results_file(payload)
+    except Exception as e:
+        try:
+            logger.warning(f"Hrio Design 运行期 JSON 缓存写入失败: {e}")
+        except Exception:
+            pass
+
+
+def _history_payload_as_runtime() -> Dict[str, Any]:
+    try:
+        data = _read_automation_history_file()
+    except Exception:
+        data = {"items": []}
+    items = data.get("items") if isinstance(data.get("items"), list) else []
+    groups: List[Dict[str, Any]] = []
+    videos: List[Dict[str, Any]] = []
+    for item in items:
+        g = _history_item_to_runtime_group(item)
+        if g:
+            groups.append(g)
+        v = _history_item_to_runtime_video(item)
+        if v:
+            videos.append(v)
+    groups = _dedupe_runtime_items(groups, ("cache_key", "run_id"), _RUNTIME_RESULTS_MAX_GROUPS)
+    videos = _dedupe_runtime_items(videos, ("key", "run_id"), _RUNTIME_RESULTS_MAX_VIDEOS)
+    return {"groups": groups, "videos": videos}
+
+
+def _runtime_memory_payload() -> Dict[str, Any]:
+    groups = sorted(
+        _LAST_THREE_VIEW_RUNTIME.values(),
+        key=lambda x: float(x.get("updated_at") or 0),
+        reverse=True,
+    )
+    videos = sorted(
+        _LAST_VIDEO_RUNTIME.values(),
+        key=lambda x: float(x.get("updated_at") or 0),
+        reverse=True,
+    )
+    return {
+        "groups": groups,
+        "videos": videos,
+        "latest_key": _LAST_THREE_VIEW_LATEST_KEY,
+        "latest_video_key": _LAST_VIDEO_LATEST_KEY,
+    }
 
 def _publish_runtime_result(
     *,
@@ -1403,6 +1926,9 @@ def _publish_runtime_result(
         elif from_cache:
             status = "cached"
 
+        media_ref = _save_runtime_tensor_media(item.get("tensor"), key, view_key) if item.get("tensor") is not None else {}
+        image_url = _runtime_media_url(media_ref)
+
         view_payload = {
             "view": view_key,
             "label": label,
@@ -1417,8 +1943,15 @@ def _publish_runtime_result(
             "elapsed": float(item.get("elapsed") or 0),
             "info": str(item.get("info") or ""),
             "error": str(errors_by_key.get(view_key) or (item.get("info") if failed else "") or ""),
-            "image": _tensor_to_preview_data_url(item.get("tensor")) if item.get("tensor") is not None else "",
+            "image": "",
+            "url": "",
+            "view_url": "",
+            "media": media_ref,
         }
+        view_payload["image"] = image_url or (_tensor_to_preview_data_url(item.get("tensor")) if item.get("tensor") is not None else "")
+        view_payload["url"] = image_url
+        view_payload["view_url"] = image_url
+        view_payload["from_json_cache"] = bool(image_url)
         views[view_key] = view_payload
 
         # 设计师新版前端按 variant_a / variant_b / variant_c 读取结果；
@@ -1440,6 +1973,10 @@ def _publish_runtime_result(
 
     _LAST_THREE_VIEW_RUNTIME[key] = {
         "cache_key": key,
+        "run_id": key,
+        "node_type": "normal_three_view",
+        "output_strategy": "three_variants",
+        "visible_variants": ["variant_a", "variant_b", "variant_c"],
         "mode_actual": mode_actual,
         "mode_key": mode_actual,
         "template_key": mode_actual,
@@ -1452,10 +1989,11 @@ def _publish_runtime_result(
         "generate_scope": generate_scope,
         "updated_at": now,
         "updated_at_ms": int(now * 1000),
-        "has_error": any(v.get("needs_regenerate") for v in views.values()),
+        "has_error": any(v.get("needs_regenerate") for k, v in views.items() if str(k).startswith("variant_")),
         "views": views,
     }
     _LAST_THREE_VIEW_LATEST_KEY = key
+    _runtime_file_upsert(groups=[_LAST_THREE_VIEW_RUNTIME[key]])
 
 
 def _publish_single_image_runtime_result(
@@ -1480,11 +2018,15 @@ def _publish_single_image_runtime_result(
     now = time.time()
 
     image_data = ""
+    media_ref: Dict[str, Any] = {}
     if tensor is not None:
-        try:
-            image_data = _tensor_to_preview_data_url(tensor)
-        except Exception:
-            image_data = ""
+        media_ref = _save_runtime_tensor_media(tensor, key, "single")
+        image_data = _runtime_media_url(media_ref)
+        if not image_data:
+            try:
+                image_data = _tensor_to_preview_data_url(tensor)
+            except Exception:
+                image_data = ""
 
     normalized_error = str(error or "").strip()
     base_status = "success"
@@ -1512,27 +2054,23 @@ def _publish_single_image_runtime_result(
             "info": normalized_error if failed else ("普通单图结果" if has_image else "暂无图片"),
             "error": normalized_error if failed else "",
             "image": image_data if has_image else "",
+            "url": image_data if has_image else "",
+            "view_url": image_data if has_image else "",
+            "media": media_ref if has_image else {},
+            "from_json_cache": bool(has_image and image_data and not str(image_data).startswith("data:")),
         }
 
     views: Dict[str, Any] = {}
-    assignments = [
-        ("front", "正面图", True),
-        ("side", "侧面图", bool(duplicate_to_all_variants and image_data)),
-        ("back", "背面图", bool(duplicate_to_all_variants and image_data)),
-    ]
-    alias_map = {"front": ("variant_a", "方案 A"), "side": ("variant_b", "方案 B"), "back": ("variant_c", "方案 C")}
-
-    for view_key, display_label, use_image in assignments:
-        payload = _view_payload(view_key, display_label, use_image)
-        views[view_key] = payload
-        alias_key, alias_label = alias_map[view_key]
-        alias_payload = dict(payload)
-        alias_payload["view"] = alias_key
-        alias_payload["label"] = alias_label
-        views[alias_key] = alias_payload
+    front_payload = _view_payload("front", "单图结果", True)
+    views["front"] = front_payload
+    alias_payload = dict(front_payload)
+    alias_payload["view"] = "variant_a"
+    alias_payload["label"] = "单图结果"
+    views["variant_a"] = alias_payload
 
     _LAST_THREE_VIEW_RUNTIME[key] = {
         "cache_key": key,
+        "run_id": key,
         "mode_actual": "",
         "mode_key": "",
         "template_key": "",
@@ -1540,6 +2078,7 @@ def _publish_single_image_runtime_result(
         "mode_display": str(label or "普通单图"),
         "labels_prefix": str(label or "普通单图"),
         "output_strategy": "single_image",
+        "visible_variants": ["variant_a"],
         "node_type": "normal_single_image",
         "model": model,
         "image_size": image_size,
@@ -1547,30 +2086,48 @@ def _publish_single_image_runtime_result(
         "generate_scope": "单图",
         "updated_at": now,
         "updated_at_ms": int(now * 1000),
-        "has_error": any(bool(v.get("needs_regenerate")) for v in views.values()),
+        "has_error": any(bool(v.get("needs_regenerate")) for k, v in views.items() if str(k).startswith("variant_") or k == "front"),
         "views": views,
     }
     _LAST_THREE_VIEW_LATEST_KEY = key
+    _runtime_file_upsert(groups=[_LAST_THREE_VIEW_RUNTIME[key]])
+
 
 def _runtime_results_payload() -> Dict[str, Any]:
-    groups = sorted(
-        _LAST_THREE_VIEW_RUNTIME.values(),
-        key=lambda x: float(x.get("updated_at") or 0),
-        reverse=True,
+    mem = _runtime_memory_payload()
+    file_payload = _read_runtime_results_file()
+
+    # 如果历史版本尚未生成 banana_runtime_results.json，则从 automation history 兜底构建一次；
+    # 一旦用户点击“清空预览”，会写入空 runtime JSON，不再自动把全部历史塞回“最近生成”。
+    if not os.path.exists(_runtime_results_path()):
+        history_payload = _history_payload_as_runtime()
+    else:
+        history_payload = {"groups": [], "videos": []}
+
+    groups = _dedupe_runtime_items(
+        list(mem.get("groups") or []) + list(file_payload.get("groups") or []) + list(history_payload.get("groups") or []),
+        ("cache_key", "run_id"),
+        _RUNTIME_RESULTS_MAX_GROUPS,
     )
-    videos = sorted(
-        _LAST_VIDEO_RUNTIME.values(),
-        key=lambda x: float(x.get("updated_at") or 0),
-        reverse=True,
+    videos = _dedupe_runtime_items(
+        list(mem.get("videos") or []) + list(file_payload.get("videos") or []) + list(history_payload.get("videos") or []),
+        ("key", "run_id"),
+        _RUNTIME_RESULTS_MAX_VIDEOS,
     )
+
+    latest_key = str(mem.get("latest_key") or file_payload.get("latest_key") or ((groups[0] or {}).get("cache_key") if groups else "") or "")
+    latest_video_key = str(mem.get("latest_video_key") or file_payload.get("latest_video_key") or ((videos[0] or {}).get("key") if videos else "") or "")
     return {
         "ok": True,
-        "latest_key": _LAST_THREE_VIEW_LATEST_KEY,
-        "latest_video_key": _LAST_VIDEO_LATEST_KEY,
+        "version": "8.2.3",
+        "updated_at_ms": _runtime_now_ms(),
+        "latest_key": latest_key,
+        "latest_video_key": latest_video_key,
         "count": len(groups),
         "video_count": len(videos),
         "groups": groups,
         "videos": videos,
+        "latest": groups[0] if groups else {},
     }
 
 
@@ -1580,7 +2137,23 @@ def _clear_runtime_results() -> Dict[str, Any]:
     _LAST_THREE_VIEW_LATEST_KEY = ""
     _LAST_VIDEO_RUNTIME.clear()
     _LAST_VIDEO_LATEST_KEY = ""
-    return {"ok": True, "message": "已清空 Hrio Design 运行期预览缓存"}
+    empty = {
+        "ok": True,
+        "version": "8.2.3",
+        "updated_at_ms": _runtime_now_ms(),
+        "latest_key": "",
+        "latest_video_key": "",
+        "count": 0,
+        "video_count": 0,
+        "groups": [],
+        "videos": [],
+    }
+    try:
+        with _RUNTIME_RESULTS_LOCK:
+            _write_runtime_results_file(empty)
+    except Exception as e:
+        logger.warning(f"清空运行期 JSON 缓存失败: {e}")
+    return {"ok": True, "message": "已清空 Hrio Design 运行期预览缓存；历史记录不会被删除"}
 
 
 def _comfyui_view_url(filename: Any, media_type: str = "temp", subfolder: str = "") -> str:
@@ -1636,6 +2209,7 @@ def _publish_video_runtime_result(
             "local_path": str(local_path or ""),
         }
         _LAST_VIDEO_LATEST_KEY = key
+        _runtime_file_upsert(videos=[_LAST_VIDEO_RUNTIME[key]])
 
         # 只保留最近 60 条，避免长时间运行导致内存膨胀。
         if len(_LAST_VIDEO_RUNTIME) > 60:
@@ -1719,7 +2293,7 @@ def _extract_automation_payload_from_prompt(prompt_graph: Any, unique_id: Any) -
         bucket = node.get(bucket_name) or {}
         if not isinstance(bucket, dict):
             continue
-        for key in ("hrio_design_automation_payload", "automation_payload", "自动化映射"):
+        for key in ("hrio_design_automation_payload", "banana_automation_payload", "automation_payload", "自动化映射"):
             value = bucket.get(key)
             if value is None:
                 continue
@@ -1737,10 +2311,35 @@ def _resolve_automation_payload(
     unique_id: Any = None,
     prompt: Any = None,
     extra_pnginfo: Any = None,
+    values: Dict[str, Any] | None = None,
 ) -> str:
+    """
+    统一恢复自动化 JSON。
+
+    前端会把 automation_payload 写到 widget、node.properties、PROMPT inputs/properties
+    和 EXTRA_PNGINFO workflow。这里全部兜底读取，避免“已经应用自动化，但队列运行时节点拿不到 JSON”。
+    """
     text = str(automation_payload or "").strip()
     if text:
         return text
+
+    values = values if isinstance(values, dict) else {}
+    for key in (
+        "automation_payload",
+        "hrio_design_automation_payload",
+        "banana_automation_payload",
+        "自动化映射",
+        "automation",
+        "payload",
+    ):
+        value = values.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, ensure_ascii=False)
+        text = str(value or "").strip()
+        if text:
+            return text
 
     text = _extract_automation_payload_from_prompt(prompt, unique_id)
     if text:
@@ -1771,10 +2370,8 @@ def _automation_payload_widget() -> Tuple[str, Dict[str, Any]]:
 
 
 def _compose_single_image_prompt(prompt: str, negative_prompt: str = "") -> str:
-    clean_prompt = str(prompt or "").strip()
-    final_prompt = clean_prompt
-    if str(negative_prompt or "").strip():
-        final_prompt += "\n\n负面约束：" + str(negative_prompt).strip()
+    """普通单图只使用 prompt 本身；negative_prompt 仅保留给旧工作流反序列化，不再参与请求。"""
+    final_prompt = str(prompt or "").strip()
     final_prompt += "\n\n输出要求：只输出一张完整图片，不要拼图，不要多视图排版，不要文字标注，不要水印。"
     return final_prompt
 
@@ -2230,23 +2827,8 @@ def _run_three_view_jobs(
     }
 
 def _compose_manual_prompt(global_prompt: str, view_prompt: str, negative_prompt: str = "") -> str:
-    parts = []
-
-    if str(global_prompt or "").strip():
-        parts.append(str(global_prompt).strip())
-
-    if str(view_prompt or "").strip():
-        parts.append(str(view_prompt).strip())
-
-    if str(negative_prompt or "").strip():
-        parts.append("负面约束：" + str(negative_prompt).strip())
-
-    parts.append(
-        "输出要求：单张完整图片，不要拼图，不要三联图，不要九宫格，不要文字标注，不要水印。"
-        "主体边缘清晰，结构准确，光影干净，适合平面设计或室内设计提案使用。"
-    )
-
-    return "\n\n".join(parts)
+    """三方案节点只使用三个独立方案提示词；global_prompt / negative_prompt 仅保留兼容旧工作流。"""
+    return str(view_prompt or "").strip()
 
 
 
@@ -2319,13 +2901,130 @@ def _auto_payload_from_string(raw: Any) -> Dict[str, Any]:
 
 def _automation_enabled(raw: Any) -> bool:
     data = _auto_payload_from_string(raw)
-    return bool(data) and _value_as_bool(data.get("enabled"), False)
+    # 只要节点后台存在有效自动化 JSON，就默认执行自动化；只有明确 enabled=false 才禁用。
+    if not data:
+        return False
+    return _value_as_bool(data.get("enabled"), True)
+
+
+def _default_automation_output_root() -> str:
+    """
+    自动化输出根目录兜底。
+
+    用户可以不选择输出目录；为空时自动写到 ComfyUI/output/hrio_design_automation。
+    在非标准环境里取不到 ComfyUI 输出目录时，写到插件目录 hrio_design_automation_outputs。
+    """
+    candidates: List[str] = []
+
+    try:
+        import folder_paths  # type: ignore
+        output_dir = folder_paths.get_output_directory()
+        if output_dir:
+            candidates.append(os.path.join(str(output_dir), "hrio_design_automation"))
+    except Exception:
+        pass
+
+    candidates.append(os.path.join(MODULE_DIR, "hrio_design_automation_outputs"))
+
+    for path in candidates:
+        path = str(path or "").strip()
+        if not path:
+            continue
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            continue
+
+    return os.path.join(MODULE_DIR, "hrio_design_automation_outputs")
+
+
+def _auto_normalize_preview_groups(value: Any, output_root: str = "") -> List[Dict[str, Any]]:
+    """
+    规范化前端 JSON 里的 preview_groups。
+
+    这样即使 ComfyUI 运行时没有重新预览，也可以直接按照 JSON
+    中的 image_path / items 执行；同时兼容 output_root 为空时的默认输出目录。
+    """
+    if not isinstance(value, list):
+        return []
+
+    groups: List[Dict[str, Any]] = []
+    for raw_group in value:
+        if not isinstance(raw_group, dict):
+            continue
+
+        seq = str(raw_group.get("sequence") or raw_group.get("seq") or "").strip()
+        if not seq:
+            seq = _auto_extract_sequence(str(raw_group.get("name") or raw_group.get("output_dir") or ""))
+        if not seq:
+            continue
+
+        items: List[Dict[str, Any]] = []
+        raw_items = raw_group.get("items") or raw_group.get("images") or raw_group.get("files") or []
+        if not isinstance(raw_items, list):
+            raw_items = []
+
+        for idx, raw_item in enumerate(raw_items):
+            if isinstance(raw_item, str):
+                image_path = raw_item
+                file_name = os.path.basename(raw_item)
+                root_path = ""
+                root_index = idx
+            elif isinstance(raw_item, dict):
+                image_path = str(
+                    raw_item.get("image_path")
+                    or raw_item.get("path")
+                    or raw_item.get("file_path")
+                    or raw_item.get("full_path")
+                    or ""
+                ).strip()
+                file_name = str(raw_item.get("file_name") or os.path.basename(image_path)).strip()
+                root_path = str(raw_item.get("root_path") or raw_item.get("input_root") or "").strip()
+                root_index = _safe_int(raw_item.get("root_index", idx), idx, 0, 999)
+            else:
+                continue
+
+            if not image_path:
+                continue
+
+            items.append({
+                "root_index": root_index,
+                "root_path": root_path,
+                "source_type": "preview_group_image",
+                "file_name": file_name or os.path.basename(image_path),
+                "image_path": image_path,
+                "sequence": seq,
+                "relative_path": str(raw_item.get("relative_path") or "") if isinstance(raw_item, dict) else "",
+            })
+
+        if not items:
+            continue
+
+        run_dir = str(raw_group.get("output_dir") or "").strip()
+        if not run_dir and output_root:
+            run_dir = os.path.join(str(output_root), f"output_{seq}", "run_01")
+
+        expected = _safe_int(raw_group.get("expected_root_count", len(items)), len(items), 0, 999)
+        present = _safe_int(raw_group.get("present_root_count", len(items)), len(items), 0, 999)
+        groups.append({
+            "sequence": seq,
+            "items": sorted(items, key=lambda x: int(x.get("root_index") or 0)),
+            "output_dir": run_dir,
+            "present_root_count": present or len(items),
+            "expected_root_count": expected or len(items),
+        })
+
+    groups.sort(key=lambda x: _auto_sequence_sort_key(str(x.get("sequence") or "")))
+    return groups
 
 
 def _auto_normalize_payload(raw: Any, *, save_images_default: bool = True, save_video_default: bool = False) -> Dict[str, Any]:
     data = _auto_payload_from_string(raw)
     input_roots = _auto_clean_path_list(data.get("input_roots") or data.get("inputFolders") or data.get("input_folders"), 10)
     output_root = str(data.get("output_root") or data.get("outputRoot") or "").strip()
+    if not output_root:
+        output_root = _default_automation_output_root()
     group_concurrency = _safe_int(data.get("group_concurrency", data.get("groupConcurrency", 3)), 3, 1, 10)
     max_images_per_group = _safe_int(data.get("max_images_per_group", data.get("maxImagesPerGroup", 10)), 10, 1, 10)
     require_all = _value_as_bool(data.get("require_all_roots_present"), False)
@@ -2340,10 +3039,21 @@ def _auto_normalize_payload(raw: Any, *, save_images_default: bool = True, save_
     )
     run_view = str(data.get("run_view") or data.get("view") or "").strip()
     run_mode = str(data.get("run_mode") or data.get("action") or "").strip()
+    preview_groups = _auto_normalize_preview_groups(data.get("preview_groups") or data.get("previewGroups") or [], output_root)
+    # 如果 JSON 只有 preview_groups，没有 input_roots，也从 group 里反推出根目录，方便“复制 JSON 后直接运行”。
+    if not input_roots and preview_groups:
+        inferred_roots: List[str] = []
+        for group in preview_groups:
+            for item in group.get("items") or []:
+                root = str(item.get("root_path") or "").strip()
+                if root and root not in inferred_roots:
+                    inferred_roots.append(root)
+        input_roots = inferred_roots[:10]
     return {
-        "enabled": _value_as_bool(data.get("enabled"), False),
-        "version": str(data.get("version") or "7.9.0"),
+        "enabled": _value_as_bool(data.get("enabled"), True),
+        "version": str(data.get("version") or "8.2.2"),
         "input_roots": input_roots,
+        "preview_groups": preview_groups,
         "output_root": output_root,
         "group_concurrency": group_concurrency,
         "max_input_roots": 10,
@@ -2362,35 +3072,66 @@ def _auto_normalize_payload(raw: Any, *, save_images_default: bool = True, save_
             "front": "front.png",
             "side": "side.png",
             "back": "back.png",
+            "single": "single.png",
         },
     }
 
 
 def _scan_input_root_images(root: str) -> List[Dict[str, Any]]:
+    """
+    递归扫描输入根目录。
+
+    规则：
+    - 优先从图片文件名提取数字序号，例如 001.png -> 001；
+    - 文件名没有数字时，从最近的父文件夹提取数字，例如 001/front.png -> 001；
+    - 兼容 Windows 路径和 Unicode 文件名；
+    - 只返回本地存在的图片文件，避免后续上传阶段才失败。
+    """
     items: List[Dict[str, Any]] = []
-    root = str(root or "").strip()
+    root = str(root or "").strip().strip('"')
     if not root or not os.path.isdir(root):
         return items
+
     try:
-        names = sorted(os.listdir(root))
-    except Exception:
+        walker = os.walk(root)
+        for dirpath, _dirnames, filenames in walker:
+            for name in sorted(filenames):
+                full = os.path.join(dirpath, name)
+                if not os.path.isfile(full):
+                    continue
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in _AUTOMATION_IMAGE_EXTS:
+                    continue
+
+                stem = os.path.splitext(name)[0]
+                seq = _auto_extract_sequence(stem)
+                if not seq:
+                    rel_dir = os.path.relpath(dirpath, root)
+                    parts = [] if rel_dir in {".", ""} else list(reversed(rel_dir.split(os.sep)))
+                    for part in parts:
+                        seq = _auto_extract_sequence(part)
+                        if seq:
+                            break
+
+                if not seq:
+                    continue
+
+                try:
+                    rel = os.path.relpath(full, root)
+                except Exception:
+                    rel = name
+
+                items.append({
+                    "source_type": "root_image",
+                    "file_name": name,
+                    "relative_path": rel,
+                    "image_path": full,
+                    "sequence": seq,
+                })
+    except Exception as e:
+        logger.warning(f"自动化扫描输入目录失败: {root} | {e}")
         return items
-    for name in names:
-        full = os.path.join(root, name)
-        if not os.path.isfile(full):
-            continue
-        ext = os.path.splitext(name)[1].lower()
-        if ext not in _AUTOMATION_IMAGE_EXTS:
-            continue
-        seq = _auto_extract_sequence(os.path.splitext(name)[0])
-        if not seq:
-            continue
-        items.append({
-            "source_type": "root_image",
-            "file_name": name,
-            "image_path": full,
-            "sequence": seq,
-        })
+
     return items
 
 
@@ -2425,6 +3166,38 @@ def _build_automation_sequence_groups(input_roots: List[str], output_root: str =
     return groups
 
 
+def _build_automation_sequence_groups_from_cfg(cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    自动化统一分组入口。
+
+    优先实时扫描 input_roots；如果扫描不到，自动回退到 JSON 里已经保存的
+    preview_groups。这样“应用到节点 / 应用并运行全部 / 跑本组”都不依赖
+    前端必须再次预览，也不会因为 output_root 为空而无法运行。
+    """
+    input_roots = cfg.get("input_roots") or []
+    groups: List[Dict[str, Any]] = []
+    if input_roots:
+        groups = _build_automation_sequence_groups(
+            input_roots,
+            output_root=str(cfg.get("output_root") or ""),
+            require_all_roots_present=bool(cfg.get("require_all_roots_present")),
+        )
+
+    if not groups and isinstance(cfg.get("preview_groups"), list):
+        groups = list(cfg.get("preview_groups") or [])
+        # 确保旧 JSON 里 output_dir 为空时也有默认输出目录。
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            seq = str(group.get("sequence") or "").strip()
+            if seq and not str(group.get("output_dir") or "").strip():
+                group["output_dir"] = os.path.join(str(cfg.get("output_root") or _default_automation_output_root()), f"output_{seq}", "run_01")
+
+    groups = [g for g in groups if isinstance(g, dict) and str(g.get("sequence") or "").strip()]
+    groups.sort(key=lambda x: _auto_sequence_sort_key(str(x.get("sequence") or "")))
+    return groups
+
+
 def _collect_automation_group_images(items: List[Dict[str, Any]], max_count: int = 10) -> List[str]:
     paths: List[str] = []
     for item in sorted(items or [], key=lambda x: int(x.get("root_index") or 0)):
@@ -2442,8 +3215,17 @@ def _collect_automation_group_images(items: List[Dict[str, Any]], max_count: int
 def _load_image_tensors_from_paths(paths: List[str]) -> List[torch.Tensor]:
     tensors: List[torch.Tensor] = []
     for path in paths:
-        img = Image.open(path).convert("RGB")
-        tensors.append(_pil_to_tensor(img))
+        path = str(path or "").strip().strip('"')
+        if not path:
+            continue
+        try:
+            # ImageOps.exif_transpose 避免手机照片方向错误；逐张容错，坏图不会拖垮整组。
+            from PIL import ImageOps
+            img = Image.open(path)
+            img = ImageOps.exif_transpose(img).convert("RGB")
+            tensors.append(_pil_to_tensor(img))
+        except Exception as e:
+            logger.warning(f"自动化图片读取失败，已跳过: {path} | {e}")
     return tensors
 
 
@@ -2487,21 +3269,81 @@ def _automation_history_existing_files(output_dir: str) -> Dict[str, str]:
     return out
 
 
+def _comfyui_media_ref_from_path(path: Any) -> Dict[str, Any]:
+    raw = str(path or "").strip()
+    if not raw:
+        return {}
+    abs_path = os.path.abspath(raw)
+    name = os.path.basename(abs_path)
+    ext = os.path.splitext(name)[1].lower()
+    kind = "video" if ext in {".mp4", ".mov", ".webm", ".m4v"} else "image"
+    ref: Dict[str, Any] = {
+        "name": name,
+        "path": abs_path,
+        "kind": kind,
+        "ext": ext,
+    }
+    try:
+        import folder_paths  # type: ignore
+        roots = [
+            (folder_paths.get_output_directory(), "output"),
+            (folder_paths.get_temp_directory(), "temp"),
+            (folder_paths.get_input_directory(), "input"),
+        ]
+        for root, media_type in roots:
+            root_abs = os.path.abspath(str(root or ""))
+            if not root_abs:
+                continue
+            try:
+                common = os.path.commonpath([root_abs, abs_path])
+            except Exception:
+                common = ""
+            if common == root_abs:
+                rel = os.path.relpath(abs_path, root_abs)
+                subfolder = os.path.dirname(rel).replace("\\", "/")
+                filename = os.path.basename(rel)
+                ref.update({
+                    "filename": filename,
+                    "subfolder": subfolder,
+                    "type": media_type,
+                    "view_url": _comfyui_view_url(filename, media_type, subfolder),
+                    "url": _comfyui_view_url(filename, media_type, subfolder),
+                })
+                break
+    except Exception:
+        pass
+    return ref
+
+
+def _automation_history_media_items(output_dir: str) -> List[Dict[str, Any]]:
+    files = _automation_history_existing_files(output_dir)
+    media: List[Dict[str, Any]] = []
+    for key in ("front.png", "side.png", "back.png", "single.png", "single_image.png", "result.png", "result.mp4"):
+        path = files.get(key)
+        if not path:
+            continue
+        ref = _comfyui_media_ref_from_path(path)
+        if ref:
+            ref["slot"] = key
+            media.append(ref)
+    return media
+
+
 def _read_automation_history_file() -> Dict[str, Any]:
     path = _automation_history_path()
     if not os.path.exists(path):
-        return {"ok": True, "version": "7.10.0", "updated_at_ms": 0, "count": 0, "items": []}
+        return {"ok": True, "version": "8.2.3", "updated_at_ms": 0, "count": 0, "items": []}
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
-        return {"ok": True, "version": "7.10.0", "updated_at_ms": 0, "count": 0, "items": []}
+        return {"ok": True, "version": "8.2.3", "updated_at_ms": 0, "count": 0, "items": []}
     if not isinstance(data, dict):
         data = {}
     items = data.get("items") if isinstance(data.get("items"), list) else []
     return {
         "ok": True,
-        "version": str(data.get("version") or "7.10.0"),
+        "version": str(data.get("version") or "8.2.2"),
         "updated_at_ms": int(data.get("updated_at_ms") or 0),
         "count": len(items),
         "items": items[-_AUTOMATION_HISTORY_MAX_ITEMS:],
@@ -2516,9 +3358,10 @@ def _append_automation_history_record(record: Dict[str, Any]) -> None:
         item.pop(key, None)
     output_dir = str(item.get("output_dir") or "")
     item.setdefault("output_files", _automation_history_existing_files(output_dir))
+    item.setdefault("media", _automation_history_media_items(output_dir))
     item.setdefault("created_at_ms", _automation_history_now_ms())
     item.setdefault("created_at", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-    item.setdefault("plugin_version", "7.10.0")
+    item.setdefault("plugin_version", "8.2.2")
     with _AUTOMATION_HISTORY_LOCK:
         data = _read_automation_history_file()
         items = data.get("items") if isinstance(data.get("items"), list) else []
@@ -2526,13 +3369,21 @@ def _append_automation_history_record(record: Dict[str, Any]) -> None:
         items = items[-_AUTOMATION_HISTORY_MAX_ITEMS:]
         payload = {
             "ok": True,
-            "version": "7.10.0",
+            "version": "8.2.3",
             "updated_at_ms": _automation_history_now_ms(),
             "count": len(items),
             "items": items,
         }
         with open(_automation_history_path(), "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    # 同步写入轻量运行期 JSON 缓存，供“最近生成”和“全部生成历史”直接加载。
+    try:
+        group = _history_item_to_runtime_group(item)
+        video = _history_item_to_runtime_video(item)
+        _runtime_file_upsert(groups=[group] if group else [], videos=[video] if video else [])
+    except Exception as e:
+        logger.warning(f"自动化历史同步到运行期 JSON 缓存失败: {e}")
 
 
 def _run_three_view_automation_group(
@@ -2559,6 +3410,8 @@ def _run_three_view_automation_group(
         if not image_paths:
             raise RuntimeError(f"序号 {seq} 没有找到可用图片")
         tensors = _load_image_tensors_from_paths(image_paths)
+        if not tensors:
+            raise RuntimeError(f"序号 {seq} 图片读取失败，没有可上传的有效图片")
         upload_dir = _cfg_or_manifest("upload_dir", "uploads/images")
         image_urls = _tensors_to_uploaded_urls(tensors, api_key, upload_dir)
         result = _run_three_view_jobs(
@@ -2583,6 +3436,7 @@ def _run_three_view_automation_group(
         meta = {
             "sequence": seq,
             "ok": True,
+            "run_id": f"normal_three_view:{seq}:{_automation_history_now_ms()}",
             "node_type": "normal_three_view",
             "output_dir": run_dir,
             "input_image_count": len(image_paths),
@@ -2632,6 +3486,8 @@ def _run_single_image_automation_group(
             raise RuntimeError(f"序号 {seq} 没有找到可用图片")
 
         tensors = _load_image_tensors_from_paths(image_paths)
+        if not tensors:
+            raise RuntimeError(f"序号 {seq} 图片读取失败，没有可上传的有效图片")
         upload_dir = _cfg_or_manifest("upload_dir", "uploads/images")
         image_urls = _tensors_to_uploaded_urls(tensors, api_key, upload_dir)
         final_prompt = _compose_single_image_prompt(prompt, negative_prompt)
@@ -2665,6 +3521,7 @@ def _run_single_image_automation_group(
         meta = {
             "sequence": seq,
             "ok": True,
+            "run_id": f"normal_single_image:{seq}:{_automation_history_now_ms()}",
             "node_type": "normal_single_image",
             "output_dir": run_dir,
             "input_image_count": len(image_paths),
@@ -2705,6 +3562,7 @@ def _run_single_image_automation_group(
         fail_meta = {
             "sequence": seq,
             "ok": False,
+            "run_id": f"normal_single_image:{seq}:{_automation_history_now_ms()}",
             "node_type": "normal_single_image",
             "output_dir": run_dir,
             "error": str(e),
@@ -2743,6 +3601,8 @@ def _run_video_automation_group(
             raise RuntimeError(f"序号 {seq} 没有找到可用图片")
 
         tensors = _load_image_tensors_from_paths(image_paths)
+        if not tensors:
+            raise RuntimeError(f"序号 {seq} 图片读取失败，没有可上传的有效图片")
         upload_dir = _cfg_or_manifest("upload_dir", "uploads/images")
         image_urls = _tensors_to_uploaded_urls(tensors, api_key, upload_dir)
 
@@ -2765,6 +3625,7 @@ def _run_video_automation_group(
         meta = {
             "sequence": seq,
             "ok": True,
+            "run_id": f"video:{seq}:{_automation_history_now_ms()}",
             "node_type": "video",
             "output_dir": run_dir,
             "input_image_count": len(image_paths),
@@ -2790,6 +3651,7 @@ def _run_video_automation_group(
         fail_meta = {
             "sequence": seq,
             "ok": False,
+            "run_id": f"video:{seq}:{_automation_history_now_ms()}",
             "node_type": "video",
             "output_dir": run_dir,
             "error": str(e),
@@ -2813,16 +3675,10 @@ def _run_video_automation_batch(
 ) -> Dict[str, Any]:
     start = time.time()
     cfg = _auto_normalize_payload(automation_payload, save_images_default=False, save_video_default=True)
-    if not cfg.get("input_roots"):
-        return {"ok": False, "error": "自动化已启用，但没有 input_roots。", "lines": ["❌ Hrio Design 生视频自动化失败", "自动化已启用，但没有 input_roots。"]}
-    if not cfg.get("output_root"):
-        return {"ok": False, "error": "自动化已启用，但没有 output_root。", "lines": ["❌ Hrio Design 生视频自动化失败", "自动化已启用，但没有 output_root。"]}
+    if not cfg.get("input_roots") and not cfg.get("preview_groups"):
+        return {"ok": False, "error": "自动化已启用，但没有 input_roots / preview_groups。", "lines": ["❌ Hrio Design 生视频自动化失败", "自动化已启用，但没有 input_roots / preview_groups。"]}
 
-    groups = _build_automation_sequence_groups(
-        cfg["input_roots"],
-        output_root=cfg["output_root"],
-        require_all_roots_present=bool(cfg.get("require_all_roots_present")),
-    )
+    groups = _build_automation_sequence_groups_from_cfg(cfg)
     all_group_count = len(groups)
     run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
     if run_sequences:
@@ -2867,7 +3723,7 @@ def _run_video_automation_batch(
         f"video_resolution: {_normalize_video_resolution(video_resolution)}",
         f"aspect_ratio: {_normalize_video_aspect_ratio(aspect_ratio)}",
         "enable_oss: True",
-        f"input_roots: {len(cfg['input_roots'])}",
+        f"input_roots: {len(cfg.get('input_roots') or [])}",
         f"groups: {len(groups)} / all_groups: {all_group_count}",
         f"run_sequences: {', '.join(sorted(run_sequences)) if run_sequences else '全部'}",
         f"success: {len(ok_results)}",
@@ -2928,8 +3784,6 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
         }
 
         optional = {
-            "global_prompt": ("STRING", {"default": "通用设计要求：面向平面设计师与室内设计师，输出专业设计提案级画面。请保持参考图的核心设计语言、色彩气质、材质关系、空间比例或版式秩序；画面高级、干净、真实、可落地，不要生成真实文字。", "multiline": True, "tooltip": "会自动拼到方案 A/B/C 三个提示词前面，用于控制整体设计方向。"}),
-            "negative_prompt": ("STRING", {"default": "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格标签，不要促销元素，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要错误透视，不要杂乱拼贴，不要廉价滤镜。", "multiline": True, "tooltip": "会自动拼到三个方案提示词里。"}),
             "automation_payload": _automation_payload_widget(),
         }
 
@@ -2967,6 +3821,7 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
             unique_id=unique_id,
             prompt=prompt_graph,
             extra_pnginfo=extra_pnginfo,
+            values=kwargs,
         )
 
         if not resolved_key:
@@ -3098,19 +3953,11 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
         start = time.time()
         cfg = _auto_normalize_payload(automation_payload, save_images_default=True, save_video_default=False)
         run_cache_key = f"normal_three_view_automation:{unique_id}"
-        if not cfg.get("input_roots"):
-            msg = "自动化已启用，但没有 input_roots。请在自动化面板选择输入根目录。"
+        if not cfg.get("input_roots") and not cfg.get("preview_groups"):
+            msg = "自动化已启用，但没有 input_roots / preview_groups。请在自动化面板选择输入根目录，或粘贴包含 preview_groups 的自动化 JSON。"
             img = _error_img(msg)
             return _return_images_with_ui_preview((img, img, img, img, msg, ""), label="banana_error")
-        if not cfg.get("output_root"):
-            msg = "自动化已启用，但没有 output_root。请在自动化面板选择输出根目录。"
-            img = _error_img(msg)
-            return _return_images_with_ui_preview((img, img, img, img, msg, ""), label="banana_error")
-        groups = _build_automation_sequence_groups(
-            cfg["input_roots"],
-            output_root=cfg["output_root"],
-            require_all_roots_present=bool(cfg.get("require_all_roots_present")),
-        )
+        groups = _build_automation_sequence_groups_from_cfg(cfg)
         all_group_count = len(groups)
         run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
         if run_sequences:
@@ -3123,6 +3970,14 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
             msg = "自动化没有扫描到任何有效序号组。"
             img = _error_img(msg)
             return _return_images_with_ui_preview((img, img, img, img, msg, ""), label="banana_error")
+
+        # 自动化模式下同样使用三个独立方案提示词；不拼接共同提示词/限定词/负面词。
+        prompts = {
+            "front": _compose_manual_prompt(global_prompt, front_prompt, negative_prompt),
+            "side": _compose_manual_prompt(global_prompt, side_prompt, negative_prompt),
+            "back": _compose_manual_prompt(global_prompt, back_prompt, negative_prompt),
+        }
+
         group_concurrency = int(cfg.get("group_concurrency") or 3)
         run_cache_key = f"normal_three_view_automation:{unique_id or int(time.time() * 1000)}"
         results: List[Dict[str, Any]] = []
@@ -3167,7 +4022,7 @@ class HrioBananaNormalThreeViewConcurrentNodeV330:
             f"model: {model}",
             f"image_size: {image_size}",
             f"aspect_ratio: {aspect_ratio}",
-            f"input_roots: {len(cfg['input_roots'])}",
+            f"input_roots: {len(cfg.get('input_roots') or [])}",
             f"groups: {len(groups)} / all_groups: {all_group_count}",
             f"run_sequences: {', '.join(sorted(run_sequences)) if run_sequences else '全部'}",
             f"generate_scope: {generate_scope}",
@@ -3480,14 +4335,6 @@ class HrioBananaNormalSingleImageNode:
             default_ratio = aspect_options[0]
 
         optional = {
-            "negative_prompt": (
-                "STRING",
-                {
-                    "default": "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格标签，不要促销元素，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要错误透视，不要畸形结构，不要廉价滤镜。",
-                    "multiline": True,
-                    "tooltip": "负面提示词，会拼进请求提示词里。",
-                },
-            ),
             "automation_payload": _automation_payload_widget(),
         }
 
@@ -3566,6 +4413,7 @@ class HrioBananaNormalSingleImageNode:
             unique_id=unique_id,
             prompt=prompt_graph,
             extra_pnginfo=extra_pnginfo,
+            values=kwargs,
         )
 
         if not resolved_key:
@@ -3661,16 +4509,10 @@ class HrioBananaNormalSingleImageNode:
     ):
         start = time.time()
         cfg = _auto_normalize_payload(automation_payload, save_images_default=True, save_video_default=False)
-        if not cfg.get("input_roots"):
-            return _return_images_with_ui_preview((_error_img("普通单图自动化失败：没有 input_roots"),), label="banana_normal_single_automation_error")
-        if not cfg.get("output_root"):
-            return _return_images_with_ui_preview((_error_img("普通单图自动化失败：没有 output_root"),), label="banana_normal_single_automation_error")
+        if not cfg.get("input_roots") and not cfg.get("preview_groups"):
+            return _return_images_with_ui_preview((_error_img("普通单图自动化失败：没有 input_roots / preview_groups"),), label="banana_normal_single_automation_error")
 
-        groups = _build_automation_sequence_groups(
-            cfg["input_roots"],
-            output_root=cfg["output_root"],
-            require_all_roots_present=bool(cfg.get("require_all_roots_present")),
-        )
+        groups = _build_automation_sequence_groups_from_cfg(cfg)
         all_group_count = len(groups)
         run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
         if run_sequences:
@@ -3705,22 +4547,33 @@ class HrioBananaNormalSingleImageNode:
         ok_results = [r for r in results if r.get("ok")]
         fail_results = [r for r in results if not r.get("ok")]
         elapsed = time.time() - start
+        # 收集全部成功组的输出图片路径（供媒体资产面板入库）
+        all_output_paths: List[str] = []
+        for r in ok_results:
+            p = str(r.get("local_image_path") or "").strip()
+            if p and os.path.isfile(p):
+                all_output_paths.append(p)
+ 
         last_ok = ok_results[-1] if ok_results else {}
         image_out = last_ok.get("image") if isinstance(last_ok, dict) else None
         if image_out is None:
             image_out = _error_img("普通单图自动化没有成功图片")
-
+ 
         logger.summary("普通单图自动化完成", {
             "模型": model,
             "耗时": f"{elapsed:.1f}s",
-            "input_roots": len(cfg["input_roots"]),
+            "input_roots": len(cfg.get("input_roots") or []),
             "groups": f"{len(groups)} / {all_group_count}",
             "success": len(ok_results),
             "failed": len(fail_results),
+            "output_paths": len(all_output_paths),
             "output_root": cfg["output_root"],
         })
-        return _return_images_with_ui_preview((image_out,), label="banana_normal_single_automation")
-
+        return _return_images_with_ui_preview(
+            (image_out,),
+            label="banana_normal_single_automation",
+            extra_output_paths=all_output_paths,   # ← 全部图进媒体资产
+        )
 
 class HrioBananaNormalVideoSingleOutputNode:
     """普通分类里的单输出视频节点：只输出 1 个 STRING，本地可预览视频路径。"""
@@ -3825,6 +4678,7 @@ class HrioBananaNormalVideoSingleOutputNode:
             unique_id=unique_id,
             prompt=prompt_graph,
             extra_pnginfo=extra_pnginfo,
+            values=kwargs,
         )
 
         if not resolved_key:
@@ -4000,6 +4854,7 @@ class HrioBananaPromptVideoNode:
             unique_id=unique_id,
             prompt=prompt_graph,
             extra_pnginfo=extra_pnginfo,
+            values=kwargs,
         )
 
         if not resolved_key:
@@ -4071,15 +4926,9 @@ class HrioBananaPromptVideoNode:
     ):
         start = time.time()
         cfg = _auto_normalize_payload(automation_payload, save_images_default=False, save_video_default=True)
-        if not cfg.get("input_roots"):
-            return _return_video_with_ui_preview(("❌ Hrio Design 生视频自动化失败\n自动化已启用，但没有 input_roots。", "", ""), "", label="banana_video_automation_error")
-        if not cfg.get("output_root"):
-            return _return_video_with_ui_preview(("❌ Hrio Design 生视频自动化失败\n自动化已启用，但没有 output_root。", "", ""), "", label="banana_video_automation_error")
-        groups = _build_automation_sequence_groups(
-            cfg["input_roots"],
-            output_root=cfg["output_root"],
-            require_all_roots_present=bool(cfg.get("require_all_roots_present")),
-        )
+        if not cfg.get("input_roots") and not cfg.get("preview_groups"):
+            return _return_video_with_ui_preview(("❌ Hrio Design 生视频自动化失败\n自动化已启用，但没有 input_roots / preview_groups。", "", ""), "", label="banana_video_automation_error")
+        groups = _build_automation_sequence_groups_from_cfg(cfg)
         all_group_count = len(groups)
         run_sequences = set(str(x) for x in (cfg.get("run_sequences") or []) if str(x).strip())
         if run_sequences:
@@ -4120,7 +4969,7 @@ class HrioBananaPromptVideoNode:
             f"video_resolution: {_normalize_video_resolution(video_resolution)}",
             f"aspect_ratio: {_normalize_video_aspect_ratio(aspect_ratio)}",
             "enable_oss: True",
-            f"input_roots: {len(cfg['input_roots'])}",
+            f"input_roots: {len(cfg.get('input_roots') or [])}",
             f"groups: {len(groups)} / all_groups: {all_group_count}",
             f"run_sequences: {', '.join(sorted(run_sequences)) if run_sequences else '全部'}",
             f"success: {len(ok_results)}",
@@ -4191,3 +5040,361 @@ __all__ = [
     "_clear_runtime_results",
     "_resolve_automation_payload",
 ]
+
+def _register_hrio_routes() -> None:
+    """
+    向 ComfyUI PromptServer 注册 Hrio Design 所需的后端路由。
+ 
+    前端 JS 使用的路由（见 banana_triple_view_ui.js 顶部常量）：
+      GET  /hrio-design/runtime          ← 历史弹窗 & 最近生成面板轮询
+      POST /hrio-design/runtime/clear    ← 清理历史按钮
+      GET  /hrio-design/config           ← 配置读取（可选，兜底返回空对象）
+      POST /hrio-design/automation/select-folder   ← 自动化选文件夹
+      POST /hrio-design/automation/preview         ← 自动化预览扫描
+ 
+    所有路由必须在这里注册，否则 404 → 前端永远卡在"正在读取生成历史…"状态。
+    """
+    if not _HAS_PROMPT_SERVER or PromptServer is None or aiohttp_web is None:
+        logger.warning(
+            "[Hrio Design] PromptServer / aiohttp 不可用，跳过路由注册；"
+            "历史面板将无法正常工作。"
+        )
+        return
+ 
+    try:
+        server = PromptServer.instance
+    except Exception:
+        logger.warning("[Hrio Design] 无法获取 PromptServer.instance，跳过路由注册。")
+        return
+ 
+    # ── GET /hrio-design/runtime ────────────────────────────────────────────
+    async def handle_runtime(request):
+        try:
+            payload = _runtime_results_payload()
+            return aiohttp_web.Response(
+                content_type="application/json",
+                text=json.dumps(payload, ensure_ascii=False),
+            )
+        except Exception as exc:
+            logger.error(f"[/hrio-design/runtime] 处理失败: {exc}")
+            return aiohttp_web.Response(
+                status=500,
+                content_type="application/json",
+                text=json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False),
+            )
+ 
+    # ── POST /hrio-design/runtime/clear ─────────────────────────────────────
+    async def handle_runtime_clear(request):
+        try:
+            result = _clear_runtime_results()
+            return aiohttp_web.Response(
+                content_type="application/json",
+                text=json.dumps(result, ensure_ascii=False),
+            )
+        except Exception as exc:
+            logger.error(f"[/hrio-design/runtime/clear] 处理失败: {exc}")
+            return aiohttp_web.Response(
+                status=500,
+                content_type="application/json",
+                text=json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False),
+            )
+ 
+    # ── GET /hrio-design/config ──────────────────────────────────────────────
+    async def handle_config(request):
+        try:
+            cfg_out = {
+                "ok": True,
+                "version": "8.2.3",
+                "base_url": _primary_base_url(),
+                "fallback_base_url": _fallback_base_url(),
+                "model": _cfg_or_manifest("model", "banano"),
+                "image_size": _cfg_or_manifest("image_size", "2K"),
+                "aspect_ratio": _cfg_or_manifest("aspect_ratio", "Auto"),
+            }
+            return aiohttp_web.Response(
+                content_type="application/json",
+                text=json.dumps(cfg_out, ensure_ascii=False),
+            )
+        except Exception as exc:
+            return aiohttp_web.Response(
+                status=500,
+                content_type="application/json",
+                text=json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False),
+            )
+ 
+    async def handle_automation_select_folder(request):
+        """
+        弹出系统文件夹选择对话框，返回用户选中的路径。
+
+        兼容策略（按优先级）：
+        1. tkinter.filedialog — 跨平台，ComfyUI 标准环境可用
+        2. 读取 POST body 里的 path 字段 — 用户手动粘贴路径时的降级方案
+        """
+        selected_path = ""
+        error_msg = ""
+
+        # ── 优先尝试 tkinter 文件夹对话框 ───────────────────────────────────
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            def _pick():
+                root_win = tk.Tk()
+                root_win.withdraw()
+                root_win.attributes("-topmost", True)
+                path = filedialog.askdirectory(
+                    title="选择输入根目录（Hrio Design 自动化）",
+                    parent=root_win,
+                )
+                root_win.destroy()
+                return str(path or "").strip()
+
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(_pick)
+                selected_path = fut.result(timeout=120)
+
+        except Exception as tk_err:
+            error_msg = str(tk_err)
+            logger.warning(f"[/hrio-design/automation/select-folder] tkinter 不可用: {tk_err}")
+
+        # ── 降级：读取 POST body 里的 path 字段 ─────────────────────────────
+        if not selected_path:
+            try:
+                body = await request.json()
+                fallback = str(body.get("path") or body.get("folder") or "").strip().strip('"')
+                if fallback and os.path.isdir(fallback):
+                    selected_path = fallback
+            except Exception:
+                pass
+
+        if not selected_path:
+            return aiohttp_web.Response(
+                status=400,
+                content_type="application/json",
+                text=json.dumps(
+                    {
+                        "ok": False,
+                        "path": "",
+                        "error": error_msg or "未选择目录，或对话框不可用（headless 环境请手动填写路径）",
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+
+        return aiohttp_web.Response(
+            content_type="application/json",
+            text=json.dumps({"ok": True, "path": selected_path}, ensure_ascii=False),
+        )
+ 
+    async def handle_automation_preview(request):
+        """
+        接收完整 automation_payload JSON，实时扫描输入根目录，
+        返回序号分组预览列表（含缩略图 base64）。
+        前端自动化面板点击"预览分组"或添加目录后自动调用。
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        try:
+            # ── 从 body 恢复配置 ───────────────────────────────────────────
+            input_roots = _auto_clean_path_list(
+                body.get("input_roots") or body.get("inputRoots") or [],
+                10,
+            )
+            output_root = str(body.get("output_root") or body.get("outputRoot") or "").strip()
+            if not output_root:
+                output_root = _default_automation_output_root()
+
+            max_images_per_group = _safe_int(body.get("max_images_per_group", 10), 10, 1, 10)
+            require_all = _value_as_bool(body.get("require_all_roots_present"), False)
+
+            if not input_roots:
+                return aiohttp_web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {
+                            "ok": False,
+                            "error": "没有 input_roots，请先添加输入根目录",
+                            "groups": [],
+                            "scan_reports": [],
+                            "scan_summary": {},
+                        },
+                        ensure_ascii=False,
+                    ),
+                )
+
+            # ── 扫描各根目录，收集扫描报告 ────────────────────────────────
+            scan_reports: List[Dict[str, Any]] = []
+            total_scanned = 0
+            total_images = 0
+            total_no_seq = 0
+
+            for idx, root in enumerate(input_roots):
+                root = str(root or "").strip().strip('"')
+                exists = os.path.isdir(root) if root else False
+                items = _scan_input_root_images(root) if exists else []
+                no_seq_count = 0
+
+                # 统计无序号文件数（只遍历一次）
+                if exists and root:
+                    try:
+                        for dirpath, _, filenames in os.walk(root):
+                            for name in filenames:
+                                ext = os.path.splitext(name)[1].lower()
+                                if ext not in _AUTOMATION_IMAGE_EXTS:
+                                    continue
+                                total_scanned += 1
+                                stem = os.path.splitext(name)[0]
+                                seq = _auto_extract_sequence(stem)
+                                if not seq:
+                                    no_seq_count += 1
+                                    total_no_seq += 1
+                    except Exception:
+                        pass
+
+                total_images += len(items)
+                scan_reports.append({
+                    "root_index": idx,
+                    "root_path": root,
+                    "exists": exists,
+                    "scanned_file_count": total_scanned,
+                    "image_count": len(items),
+                    "sequence_count": len({it["sequence"] for it in items}),
+                    "skipped_no_sequence_count": no_seq_count,
+                    "error": "" if exists else "目录不存在",
+                })
+
+            # ── 构建分组 ───────────────────────────────────────────────────
+            groups = _build_automation_sequence_groups(
+                input_roots,
+                output_root=output_root,
+                require_all_roots_present=require_all,
+            )
+
+            scan_summary = {
+                "root_count": len(input_roots),
+                "scanned_file_count": total_scanned,
+                "image_count": total_images,
+                "group_count": len(groups),
+                "skipped_no_sequence_count": total_no_seq,
+            }
+
+            # ── 为每组生成缩略图预览 ───────────────────────────────────────
+            preview_groups: List[Dict[str, Any]] = []
+            for g in groups:
+                seq = str(g.get("sequence") or "")
+                items = g.get("items") or []
+                image_paths = _collect_automation_group_images(items, min(max_images_per_group, 4))
+
+                preview_items: List[Dict[str, Any]] = []
+                for img_path in image_paths:
+                    item_meta = next(
+                        (it for it in items if it.get("image_path") == img_path),
+                        {},
+                    )
+                    thumb = ""
+                    width = height = 0
+                    try:
+                        from PIL import ImageOps as _ImageOps
+                        img = Image.open(img_path)
+                        img = _ImageOps.exif_transpose(img).convert("RGB")
+                        width, height = img.size
+                        # 缩略图：长边 120px
+                        long_edge = max(width, height)
+                        if long_edge > 120:
+                            scale = 120.0 / long_edge
+                            img = img.resize(
+                                (max(1, int(width * scale)), max(1, int(height * scale))),
+                                Image.LANCZOS,
+                            )
+                        buf = BytesIO()
+                        img.save(buf, format="PNG", compress_level=6)
+                        thumb = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+                    except Exception as _te:
+                        logger.warning(f"预览缩略图生成失败: {img_path} | {_te}")
+
+                    preview_items.append({
+                        "root_index": int(item_meta.get("root_index") or 0),
+                        "root_path": str(item_meta.get("root_path") or ""),
+                        "file_name": str(item_meta.get("file_name") or os.path.basename(img_path)),
+                        "relative_path": str(item_meta.get("relative_path") or ""),
+                        "image_path": img_path,
+                        "sequence": seq,
+                        "thumb_data_url": thumb,
+                        "width": width,
+                        "height": height,
+                        "preview_error": "",
+                    })
+
+                preview_groups.append({
+                    "sequence": seq,
+                    "output_dir": str(g.get("output_dir") or ""),
+                    "present_root_count": int(g.get("present_root_count") or len(items)),
+                    "expected_root_count": int(g.get("expected_root_count") or len(input_roots)),
+                    "preview_count": len(preview_items),
+                    "preview_items": preview_items,
+                    "items": [
+                        {
+                            "root_index": int(it.get("root_index") or 0),
+                            "root_path": str(it.get("root_path") or ""),
+                            "source_type": str(it.get("source_type") or "root_image"),
+                            "file_name": str(it.get("file_name") or ""),
+                            "image_path": str(it.get("image_path") or ""),
+                            "sequence": seq,
+                            "relative_path": str(it.get("relative_path") or ""),
+                        }
+                        for it in items
+                    ],
+                })
+
+            return aiohttp_web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {
+                        "ok": True,
+                        "group_count": len(preview_groups),
+                        "output_root": output_root,
+                        "groups": preview_groups,
+                        "scan_reports": scan_reports,
+                        "scan_summary": scan_summary,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+
+        except Exception as exc:
+            logger.error(f"[/hrio-design/automation/preview] 处理失败: {exc}")
+            return aiohttp_web.Response(
+                status=500,
+                content_type="application/json",
+                text=json.dumps(
+                    {"ok": False, "error": str(exc), "groups": [], "scan_reports": [], "scan_summary": {}},
+                    ensure_ascii=False,
+                ),
+            )
+    # ── 注册所有路由 ──────────────────────────────────────────────────────────
+    try:
+        routes = [
+            ("GET",  "/hrio-design/runtime",                       handle_runtime),
+            ("POST", "/hrio-design/runtime/clear",                 handle_runtime_clear),
+            ("GET",  "/hrio-design/config",                        handle_config),
+            ("POST", "/hrio-design/automation/select-folder",      handle_automation_select_folder),
+            ("POST", "/hrio-design/automation/preview",            handle_automation_preview),
+        ]
+        for method, path, handler in routes:
+            try:
+                server.app.router.add_route(method, path, handler)
+                logger.info(f"[Hrio Design] 路由已注册: {method} {path}")
+            except Exception as _re:
+                # 路由已存在（热重载场景）忽略
+                if "already" not in str(_re).lower():
+                    logger.warning(f"[Hrio Design] 路由注册警告 {method} {path}: {_re}")
+    except Exception as exc:
+        logger.error(f"[Hrio Design] 路由批量注册失败: {exc}")
+ 
+ 
+# 立即执行注册（模块加载时）
+_register_hrio_routes()

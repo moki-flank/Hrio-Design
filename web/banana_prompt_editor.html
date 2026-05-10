@@ -1445,9 +1445,9 @@
     (() => {
       "use strict";
 
-      const DEFAULT_PLUGIN_VERSION = "8.1.0";
-      const STORAGE_KEY = "hrio.designPromptEditor.cache.v810";
-      const UI_STATE_KEY = "hrio.designPromptEditor.ui.v810";
+      const DEFAULT_PLUGIN_VERSION = "8.2.2";
+      const STORAGE_KEY = "hrio.designPromptEditor.cache.v822";
+      const UI_STATE_KEY = "hrio.designPromptEditor.ui.v822";
       const COMMAND_CHANNEL = "hrio_design_template_bridge";
       const COMMAND_STORAGE_KEY = "hrio_design_template_command";
       const LIVE_CONFIG_KEY = "hrio_design_template_live_config";
@@ -1487,6 +1487,11 @@
 
       const RUNTIME_CLEAR_ROUTES = [
         "/hrio-design/runtime/clear"
+      ];
+
+      const HISTORY_GET_ROUTES = [
+        "/hrio-design/runtime",
+        "/hrio-design/automation/history"
       ];
 
       const DESIGNER_TYPE_OPTIONS = {
@@ -1656,12 +1661,9 @@
 
       const PROMPT_FIELDS = [
         ["image_roles", "参考图说明"],
-        ["global_prompt", "全局任务"],
         ["variant_a_prompt", "方案 A"],
         ["variant_b_prompt", "方案 B"],
-        ["variant_c_prompt", "方案 C"],
-        ["consistency_prompt", "一致性"],
-        ["negative_prompt", "反向约束"]
+        ["variant_c_prompt", "方案 C"]
       ];
 
       const DEFAULT_MODE_OPTIONS = Object.fromEntries(
@@ -1716,12 +1718,9 @@
           designer_type: def.designer_type || "graphic_design",
           preview_urls: {},
           image_roles: "Image 1 = 主体素材；Image 2 = 风格参考；Image 3 = 配色参考；Image 4 = 版式参考；Image 5 = 材质或纹理参考；Image 6 = 背景或场景参考。",
-          global_prompt: `任务：${cleanTitle(def.title)}。请基于上传参考图生成高审美设计图，保持构图高级、层级清晰、材质自然、画面干净。不要直接生成文字，不要乱码，不要水印。`,
-          variant_a_prompt: `${def.variants?.[0]?.label || "方案 A"}：${def.variants?.[0]?.name || "稳定高级版"}。构图稳定、清晰、适合正式商业使用。`,
-          variant_b_prompt: `${def.variants?.[1]?.label || "方案 B"}：${def.variants?.[1]?.name || "视觉强化版"}。增强视觉吸引力、层次、空间与光影。`,
-          variant_c_prompt: `${def.variants?.[2]?.label || "方案 C"}：${def.variants?.[2]?.name || "实验设计版"}。更有设计张力，但仍保持高级可落地。`,
-          consistency_prompt: "三张图必须保持同一设计系统、同一视觉气质、同一素材逻辑，只允许方案表达差异。",
-          negative_prompt: "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格，不要促销标签，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要杂乱拼贴，不要廉价滤镜。"
+          variant_a_prompt: `任务：${cleanTitle(def.title)}。${def.variants?.[0]?.label || "方案 A"}：${def.variants?.[0]?.name || "稳定高级版"}。基于上传参考图生成高审美设计图，构图稳定、清晰、层级高级、适合正式商业使用。`,
+          variant_b_prompt: `任务：${cleanTitle(def.title)}。${def.variants?.[1]?.label || "方案 B"}：${def.variants?.[1]?.name || "视觉强化版"}。基于上传参考图生成高审美设计图，增强视觉吸引力、层次、空间与光影。`,
+          variant_c_prompt: `任务：${cleanTitle(def.title)}。${def.variants?.[2]?.label || "方案 C"}：${def.variants?.[2]?.name || "实验设计版"}。基于上传参考图生成高审美设计图，更有设计张力，但仍保持高级可落地。`
         };
       }
 
@@ -2134,6 +2133,30 @@
         return views[variantKey] || views[variantKey.replace("variant_", "方案")] || null;
       }
 
+      function getVariantByKey(variantKey) {
+        return getVariants().find((item) => item.key === variantKey) || getCurrentVariant();
+      }
+
+      function displayVariantsForGroup(group) {
+        const variants = getVariants();
+        const keys = Array.isArray(group?.visible_variants) && group.visible_variants.length
+          ? group.visible_variants.map((x) => String(x || "")).filter(Boolean)
+          : ((String(group?.output_strategy || "").toLowerCase() === "single_image" || String(group?.node_type || "").includes("single_image"))
+            ? ["variant_a"]
+            : variants.map((item) => item.key));
+        const deduped = [];
+        const seen = new Set();
+        keys.forEach((key) => {
+          if (seen.has(key)) return;
+          const variant = getVariantByKey(key);
+          if (variant) {
+            seen.add(variant.key);
+            deduped.push(variant);
+          }
+        });
+        return deduped.length ? deduped : [getCurrentVariant()];
+      }
+
       function pickImage(item) {
         if (!item) return "";
         if (typeof item === "string") return item;
@@ -2151,6 +2174,146 @@
           error,
           status: item.status || item.state || (error ? "failed" : image ? "success" : "missing")
         };
+      }
+
+
+      function historyMediaUrl(ref) {
+        if (!ref || typeof ref !== "object") return "";
+        return String(ref.url || ref.view_url || ref.public_url || ref.publicUrl || ref.oss_url || ref.ossUrl || ref.mp4url || "").trim();
+      }
+
+      function historyFirstMedia(item, names) {
+        const media = Array.isArray(item?.media) ? item.media : [];
+        for (const name of names) {
+          const found = media.find((m) => String(m?.slot || m?.filename || m?.name || "").toLowerCase().endsWith(String(name).toLowerCase()));
+          if (found) return found;
+        }
+        return null;
+      }
+
+      function makeHistoryView(view, label, ref, ok, errorText, info) {
+        const url = historyMediaUrl(ref || {});
+        const failed = Boolean(!ok || errorText);
+        const status = failed ? "failed" : (url ? "success" : "missing");
+        return {
+          view,
+          label,
+          status,
+          failed,
+          placeholder: !url,
+          needs_regenerate: failed || !url,
+          from_history: true,
+          from_json_cache: true,
+          error: failed ? String(errorText || "未知错误") : "",
+          info: info || "历史 JSON 缓存",
+          image: url,
+          url,
+          view_url: url,
+          media: ref || {}
+        };
+      }
+
+      function historyItemToRuntimeGroup(item) {
+        if (!item || typeof item !== "object") return null;
+        const nodeType = String(item.node_type || item.type || "");
+        if (nodeType === "video") return null;
+        const ok = item.ok !== false;
+        const err = ok ? "" : String(item.error || "未知错误");
+        const views = {};
+
+        if (nodeType === "normal_three_view") {
+          views.front = makeHistoryView("front", "正面图", historyFirstMedia(item, ["front.png"]), ok, err, "三方案自动化历史 JSON 缓存");
+          views.side = makeHistoryView("side", "侧面图", historyFirstMedia(item, ["side.png"]), ok, err, "三方案自动化历史 JSON 缓存");
+          views.back = makeHistoryView("back", "背面图", historyFirstMedia(item, ["back.png"]), ok, err, "三方案自动化历史 JSON 缓存");
+        } else {
+          const ref = historyFirstMedia(item, ["single.png", "single_image.png", "result.png", "front.png"]);
+          views.front = makeHistoryView("front", "单图结果", ref, ok, err, "统一运行结果 JSON 缓存（单图）");
+          views.variant_a = { ...views.front, view: "variant_a", label: "单图结果" };
+        }
+
+        const aliasMap = nodeType === "normal_three_view"
+          ? { front: ["variant_a", "方案 A"], side: ["variant_b", "方案 B"], back: ["variant_c", "方案 C"] }
+          : { front: ["variant_a", "单图结果"] };
+        Object.entries(aliasMap).forEach(([src, [alias, label]]) => {
+          if (views[src] && !views[alias]) views[alias] = { ...views[src], view: alias, label };
+        });
+
+        const ms = Number(item.created_at_ms || item.updated_at_ms || Date.now());
+        const title = item.labels || item.template_display || item.mode_display || (nodeType === "normal_three_view" ? "三方案并发" : "普通单图");
+        return {
+          cache_key: String(item.run_id || `history:${nodeType}:${item.sequence || ""}:${ms}`),
+          run_id: String(item.run_id || ""),
+          sequence: String(item.sequence || ""),
+          node_type: nodeType || "normal_single_image",
+          from_history: true,
+          from_json_cache: true,
+          template_display: title,
+          mode_display: title,
+          mode_actual: item.mode_key || item.template_key || "",
+          mode_key: item.mode_key || item.template_key || "",
+          template_key: item.template_key || item.mode_key || "",
+          output_strategy: nodeType === "normal_three_view" ? "three_variants" : "single_image",
+          visible_variants: nodeType === "normal_three_view" ? ["variant_a", "variant_b", "variant_c"] : ["variant_a"],
+          model: item.display_model || item.model || "",
+          image_size: item.image_size || "",
+          aspect_ratio: item.aspect_ratio || "",
+          generate_scope: item.generate_scope || "自动化",
+          output_dir: item.output_dir || "",
+          source_images: item.source_images || [],
+          input_image_count: Number(item.input_image_count || 0),
+          uploaded_image_count: Number(item.uploaded_image_count || 0),
+          updated_at: ms / 1000,
+          updated_at_ms: ms,
+          has_error: !ok,
+          views
+        };
+      }
+
+      function mergeRuntimeGroups(runtimeJson, historyJson) {
+        const base = runtimeJson && typeof runtimeJson === "object" ? runtimeJson : {};
+        const groups = [];
+        if (Array.isArray(base.groups)) groups.push(...base.groups);
+        else if (base.views || base.results) groups.push(base);
+
+        if (Array.isArray(historyJson?.groups)) groups.push(...historyJson.groups);
+        const historyItems = Array.isArray(historyJson?.items) ? historyJson.items : [];
+        historyItems.forEach((item) => {
+          const group = historyItemToRuntimeGroup(item);
+          if (group) groups.push(group);
+        });
+
+        const seen = new Set();
+        const deduped = groups
+          .filter(Boolean)
+          .sort((a, b) => Number(b.updated_at_ms || b.updated_at || 0) - Number(a.updated_at_ms || a.updated_at || 0))
+          .filter((group) => {
+            const key = String(group.cache_key || group.run_id || `${group.node_type}:${group.sequence}:${group.updated_at_ms || ""}`);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
+        return {
+          ...base,
+          ok: true,
+          groups: deduped,
+          count: deduped.length,
+          latest: deduped[0] || {},
+          history_count: historyItems.length
+        };
+      }
+
+      async function fetchHistoryJson() {
+        for (const route of HISTORY_GET_ROUTES) {
+          try {
+            const resp = await fetch(route, { cache: "no-store" });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return await resp.json();
+          } catch (error) {
+            console.warn("history failed:", route, error);
+          }
+        }
+        return { ok: false, items: [] };
       }
 
       function previewSourceForVariant(variant) {
@@ -2208,10 +2371,14 @@
         const latest = appState.runtime.latest || appState.runtime;
         const groupsRaw = latest.groups || latest.results_groups || appState.runtime.groups || [];
         let groups = Array.isArray(groupsRaw) && groupsRaw.length ? groupsRaw : (latest.views || latest.results ? [latest] : []);
-        groups = groups.filter((group) => groupMatchesMode(group));
+
+        // 过滤掉输入 0 张、上传 0 张的影子记录
+        groups = groups.filter((group) =>
+          Number(group.input_image_count || 0) > 0 || Number(group.uploaded_image_count || 0) > 0
+        );
 
         if (appState.previewMode === "failed") {
-          groups = groups.filter((group) => getVariants().some((variant) => {
+          groups = groups.filter((group) => displayVariantsForGroup(group).some((variant) => {
             const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
             const s = String(item.status || "").toLowerCase();
             return item.error || ["failed", "fail", "error", "missing"].includes(s);
@@ -2231,19 +2398,21 @@
             group.updated_at ? new Date((Number(group.updated_at) > 10000000000 ? Number(group.updated_at) : Number(group.updated_at) * 1000)).toLocaleString() : ""
           ].filter(Boolean).join(" · ");
 
-          const views = getVariants().map((variant) => {
+          const views = displayVariantsForGroup(group).map((variant) => {
             const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
             const image = pickImage(item);
             const status = String(item.status || "missing").toLowerCase();
             const failed = item.error || ["failed", "fail", "error"].includes(status);
+            const displayLabel = String(item.label || variant.label || "生成结果");
+            const displayName = String(item.label || variant.name || variant.label || "生成结果");
             return `
               <div class="runtime-view ${failed ? "failed" : "success"}" data-group="${groupIndex}" data-variant="${escapeHtml(variant.key)}">
                 ${
                   image
-                    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(variant.label)}" loading="lazy" />`
+                    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(displayLabel)}" loading="lazy" />`
                     : `<div class="placeholder" style="min-height:150px;border:0;border-radius:18px;">${failed ? "生成失败" : "暂无图片"}</div>`
                 }
-                <span>${escapeHtml(variant.label)} · ${failed ? "可重抽" : "生成结果"}</span>
+                <span>${escapeHtml(displayName)} · ${failed ? "可重抽" : "生成结果"}</span>
               </div>
             `;
           }).join("");
@@ -2265,9 +2434,10 @@
         $$(".runtime-view").forEach((card) => {
           card.onclick = () => {
             const group = groups[Number(card.dataset.group || 0)];
-            const variant = getVariants().find((item) => item.key === card.dataset.variant) || getCurrentVariant();
+            const variant = getVariantByKey(card.dataset.variant);
             const item = normalizeRuntimeItem((group.views || group.results || {})[variant.key]);
-            openImageModal(`${variant.label} · ${variant.name}`, pickImage(item), runtimeDetailText(group, variant, item), {
+            const displayTitle = String(item.label || `${variant.label} · ${variant.name}`);
+            openImageModal(displayTitle, pickImage(item), runtimeDetailText(group, variant, item), {
               action: "retry_one",
               variant_key: variant.key,
               group
@@ -2311,19 +2481,28 @@
 
       async function refreshRuntime(showTip = false) {
         $("#runtimePollState").textContent = "读取中...";
+        const historyJson = await fetchHistoryJson();
         for (const route of RUNTIME_GET_ROUTES) {
           try {
             const resp = await fetch(route, { cache: "no-store" });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            appState.runtime = await resp.json();
-            $("#runtimePollState").textContent = "已读取";
+            const runtimeJson = await resp.json();
+            appState.runtime = mergeRuntimeGroups(runtimeJson, historyJson);
+            $("#runtimePollState").textContent = `已读取 ${appState.runtime.count || 0} 条`;
             renderPreview();
             maybeAutoRetryFailed();
-            if (showTip) toast("已刷新，返回图会同步到当前预览");
+            if (showTip) toast("已刷新：最近生成与历史记录均来自统一 JSON 缓存");
             return true;
           } catch (error) {
             console.warn("runtime failed:", route, error);
           }
+        }
+        appState.runtime = mergeRuntimeGroups({}, historyJson);
+        renderPreview();
+        if ((appState.runtime.groups || []).length) {
+          $("#runtimePollState").textContent = `已从历史读取 ${appState.runtime.count || 0} 条`;
+          if (showTip) toast("runtime 接口不可用，已从兼容历史 JSON 加载结果");
+          return true;
         }
         $("#runtimePollState").textContent = "读取失败";
         if (showTip) toast("运行结果接口暂不可用");
@@ -2340,7 +2519,7 @@
         appState.runtime = {};
         $("#runtimePollState").textContent = "已清空";
         renderPreview();
-        toast("已清空前端预览缓存");
+        toast("已清空最近生成缓存，历史记录仍保留");
       }
 
       function statusText(status) {
@@ -2547,8 +2726,7 @@
           mode_options: modeOptions,
           mode_meta: modeMeta,
           preview_urls,
-          modes,
-          global_negative_prompt: "不要真实文字，不要乱码字体，不要水印，不要二维码，不要价格，不要促销标签，不要购物按钮，不要低清晰度，不要明显 AI 扭曲，不要畸形结构，不要杂乱拼贴，不要廉价滤镜。"
+          modes
         };
       }
 
@@ -2667,9 +2845,6 @@
           `【参考图说明】`,
           data.image_roles || "",
           "",
-          `【全局任务】`,
-          data.global_prompt || "",
-          "",
           `【方案 A】`,
           data.variant_a_prompt || "",
           "",
@@ -2677,13 +2852,7 @@
           data.variant_b_prompt || "",
           "",
           `【方案 C】`,
-          data.variant_c_prompt || "",
-          "",
-          `【一致性要求】`,
-          data.consistency_prompt || "",
-          "",
-          `【反向约束】`,
-          data.negative_prompt || ""
+          data.variant_c_prompt || ""
         ].join("\n");
       }
 

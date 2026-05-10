@@ -5,8 +5,8 @@
   const EDITOR_ROUTE = "/hrio-design/editor";
   const AUTOMATION_SELECT_FOLDER_ROUTE = "/hrio-design/automation/select-folder";
   const AUTOMATION_PREVIEW_ROUTE = "/hrio-design/automation/preview";
-  const AUTOMATION_HISTORY_ROUTE = "/hrio-design/automation/history";
-  const AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/automation/history-clear";
+  const AUTOMATION_HISTORY_ROUTE = "/hrio-design/runtime";
+  const AUTOMATION_HISTORY_CLEAR_ROUTE = "/hrio-design/runtime/clear";
   const CONFIG_ROUTE = "/hrio-design/config";
   const RUNTIME_ROUTE = "/hrio-design/runtime";
   const OLD_EDITOR_ROUTES = [
@@ -24,7 +24,8 @@
   const MODAL_ID = "hrio-design-automation-modal";
   const EDITOR_MODAL_ID = "hrio-design-editor-modal";
   const VIDEO_MODAL_ID = "hrio-design-video-modal";
-  const EXTENSION_NAME = "hrio.design.bridge.v8_1_8";
+  const HISTORY_MODAL_ID = "hrio-design-history-modal";
+  const EXTENSION_NAME = "hrio.design.bridge.v8_2_2";
 
   const COMMAND_CHANNEL = "hrio_design_three_view_bridge";
   const DESIGNER_COMMAND_CHANNEL = "hrio_design_template_bridge";
@@ -32,8 +33,11 @@
   const DESIGNER_COMMAND_STORAGE_KEY = "hrio_design_template_command";
   const LIVE_CONFIG_KEY = "hrio_design_three_view_live_config";
   const DESIGNER_LIVE_CONFIG_KEY = "hrio_design_template_live_config";
-  const AUTOMATION_STORAGE_KEY = "hrio_design_automation_payload_v810";
+  const AUTOMATION_STORAGE_KEY = "hrio_design_automation_payload_v821";
   const OLD_AUTOMATION_STORAGE_KEYS = [
+    "hrio_design_automation_payload_v810",
+    "hrio_design_automation_payload_v819",
+    "hrio_design_automation_payload_v820",
     "banana_three_view_automation_payload",
     "banana_three_view_automation_payload_v710",
     "banana_three_view_automation_payload_v712",
@@ -116,6 +120,10 @@
       historyLoadedAt: 0,
       clearedAt: 0,
       clearGuardUntil: 0,
+    },
+    history: {
+      items: [],
+      loadedAt: 0,
     },
     drag: {
       active: false,
@@ -586,6 +594,82 @@
         max-height: min(62vh, 560px);
         border-radius: 14px;
         background: #0b1220;
+      }
+
+      #${HISTORY_MODAL_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 1000003;
+        display: none;
+        place-items: center;
+        background: rgba(10, 22, 36, .46);
+        backdrop-filter: blur(8px);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      #${HISTORY_MODAL_ID}.show {
+        display: grid;
+      }
+
+      #${HISTORY_MODAL_ID} .history-card {
+        width: min(1120px, calc(100vw - 36px));
+        max-height: calc(100vh - 42px);
+        overflow: hidden;
+        border-radius: 24px;
+        border: 1px solid rgba(255,255,255,.92);
+        background: linear-gradient(135deg, rgba(239,248,255,.98), rgba(255,248,252,.96));
+        box-shadow: 0 28px 82px rgba(31,73,118,.34);
+        color: #24496f;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #${HISTORY_MODAL_ID} .history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 16px 12px 18px;
+        border-bottom: 1px solid rgba(113,159,210,.18);
+      }
+
+      #${HISTORY_MODAL_ID} .history-head strong { display: block; font-size: 16px; font-weight: 950; }
+      #${HISTORY_MODAL_ID} .history-head span { display: block; margin-top: 3px; font-size: 12px; color: rgba(49,93,143,.66); }
+      #${HISTORY_MODAL_ID} .history-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+      #${HISTORY_MODAL_ID} .history-btn,
+      #${HISTORY_MODAL_ID} .history-close {
+        height: 32px;
+        border-radius: 13px;
+        border: 1px solid rgba(113,159,210,.20);
+        background: rgba(255,255,255,.76);
+        color: #315d8f;
+        cursor: pointer;
+        padding: 0 11px;
+        font-size: 12px;
+        font-weight: 900;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #${HISTORY_MODAL_ID} .history-close { width: 32px; padding: 0; font-size: 18px; }
+      #${HISTORY_MODAL_ID} .history-body { padding: 16px; overflow: auto; display: grid; gap: 12px; }
+      #${HISTORY_MODAL_ID} .history-empty { padding: 18px; border-radius: 18px; background: rgba(255,255,255,.68); border: 1px dashed rgba(113,159,210,.24); color: rgba(49,93,143,.72); font-size: 13px; line-height: 1.6; }
+      #${HISTORY_MODAL_ID} .history-item { display: grid; grid-template-columns: 220px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border-radius: 18px; background: rgba(255,255,255,.70); border: 1px solid rgba(113,159,210,.18); }
+      #${HISTORY_MODAL_ID} .history-main { min-width: 0; display: grid; gap: 5px; }
+      #${HISTORY_MODAL_ID} .history-title { font-size: 13px; font-weight: 950; color: #24496f; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      #${HISTORY_MODAL_ID} .history-meta { font-size: 11px; color: rgba(49,93,143,.68); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      #${HISTORY_MODAL_ID} .history-status-ok { color: #12805f; font-weight: 950; }
+      #${HISTORY_MODAL_ID} .history-status-bad { color: #b42318; font-weight: 950; }
+      #${HISTORY_MODAL_ID} .history-media { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+      #${HISTORY_MODAL_ID} .history-thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; border: 1px solid rgba(96,135,190,.18); background: #eef5ff; }
+      #${HISTORY_MODAL_ID} video.history-thumb { object-fit: cover; background: #0b1220; }
+      #${HISTORY_MODAL_ID} .history-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; color: rgba(49,93,143,.62); word-break: break-all; }
+      @media (max-width: 860px) {
+        #${HISTORY_MODAL_ID} .history-item { grid-template-columns: 1fr; }
+        #${HISTORY_MODAL_ID} .history-actions { justify-content: flex-end; }
       }
 
       #${MODAL_ID} {
@@ -1245,8 +1329,7 @@
     };
 
     panel.querySelector("[data-history]").onclick = () => {
-      openAutomationModal();
-      fetchAutomationHistory(true);
+      openHistoryModal();
     };
 
     document.body.appendChild(panel);
@@ -1327,6 +1410,19 @@
       .replace(/[\s\-]+/g, "_");
   }
 
+  function isAutomationWidgetName(value) {
+    const n = normalizeWidgetName(value);
+    if (!n) return false;
+    return (
+      n === "automation_payload" ||
+      n === "hrio_design_automation_payload" ||
+      n === "banana_automation_payload" ||
+      n === "自动化映射" ||
+      n.includes("automation_payload") ||
+      String(value || "").includes("自动化映射")
+    );
+  }
+
   function findWidget(node, names) {
     const widgets = node?.widgets || [];
     const targetNames = names.map(normalizeWidgetName);
@@ -1384,7 +1480,7 @@
       text.includes(NORMAL_SINGLE_IMAGE_CLASS) ||
       text.includes("🎨 Hrio｜普通单图生成") ||
       text.includes("普通单图生成") ||
-      (hasPrompt && hasImageModel && hasWidget(node, ["negative_prompt", "负面提示词"]) && !hasWidget(node, ["front_prompt", "方案A提示词"]))
+      (hasPrompt && hasImageModel && !hasWidget(node, ["front_prompt", "方案A提示词", "side_prompt", "back_prompt"]))
     ) {
       return "normal_single";
     }
@@ -1415,6 +1511,10 @@
     }
 
     if (hasWidget(node, ["automation_payload", "自动化映射"])) {
+      return "automation";
+    }
+
+    if (text.includes("Hrio_Design") || text.includes("HrioBanana") || text.includes("Hrio Design")) {
       return "automation";
     }
 
@@ -1603,6 +1703,84 @@
     }
     refreshAutomationPayloadVisibility(node);
   }
+
+  function shouldDropPromptNoiseWidgetName(widgetName) {
+    const n = normalizeWidgetName(widgetName);
+    if (!n) return false;
+
+    const exact = new Set([
+      "global_prompt",
+      "common_prompt",
+      "shared_prompt",
+      "common_negative_prompt",
+      "global_negative_prompt",
+      "negative_prompt",
+      "共同提示词",
+      "共同限定词",
+      "全局提示词",
+      "全局限定词",
+      "负面提示词",
+      "负面限定词",
+    ]);
+    if (exact.has(n)) return true;
+
+    const raw = String(widgetName || "");
+    if (raw.includes("共同提示词") || raw.includes("共同限定词")) return true;
+    if (raw.includes("全局提示词") || raw.includes("全局限定词")) return true;
+    if (raw.includes("负面提示词") || raw.includes("负面限定词")) return true;
+
+    if (n.includes("global") && n.includes("prompt")) return true;
+    if (n.includes("common") && n.includes("prompt")) return true;
+    if (n.includes("shared") && n.includes("prompt")) return true;
+    if (n.includes("negative") && n.includes("prompt")) return true;
+
+    return false;
+  }
+
+  function dropPromptNoiseWidgets(node) {
+    if (!node || !Array.isArray(node.widgets)) return false;
+
+    let changed = false;
+    for (let i = node.widgets.length - 1; i >= 0; i -= 1) {
+      const widget = node.widgets[i];
+      const candidates = [
+        widget?.name,
+        widget?.label,
+        widget?.displayName,
+        widget?.localized_name,
+      ].filter(Boolean);
+
+      if (!candidates.some(shouldDropPromptNoiseWidgetName)) continue;
+
+      node.widgets.splice(i, 1);
+      try {
+        if (Array.isArray(node.widgets_values)) node.widgets_values.splice(i, 1);
+      } catch {}
+      changed = true;
+    }
+
+    if (changed) {
+      try {
+        node.properties = node.properties || {};
+        delete node.properties.global_prompt;
+        delete node.properties.common_prompt;
+        delete node.properties.shared_prompt;
+        delete node.properties.common_negative_prompt;
+        delete node.properties.global_negative_prompt;
+        delete node.properties.negative_prompt;
+        delete node.properties["共同提示词"];
+        delete node.properties["共同限定词"];
+        delete node.properties["全局提示词"];
+        delete node.properties["全局限定词"];
+        delete node.properties["负面提示词"];
+        delete node.properties["负面限定词"];
+      } catch {}
+      markCanvasDirty(node);
+    }
+
+    return changed;
+  }
+
   function shouldHideWidgetForKind(kind, widgetName) {
     const n = normalizeWidgetName(widgetName);
     if (n === "automation_payload") return true;
@@ -1673,6 +1851,7 @@
         node.properties["banana_beautified"] = true;
 
         if (Array.isArray(node.widgets)) {
+          dropPromptNoiseWidgets(node);
           node.widgets.forEach((widget) => {
             if (!widget || !widget.name) return;
 
@@ -2159,6 +2338,47 @@
 
         async nodeCreated(node) {
           if (!isTemplateNode(node)) return;
+
+          // ── PATCH v2：只拦截节点底部缩略图，不破坏媒体资产面板 ──────────────
+          // ComfyUI 的执行顺序是：
+          // 1) WS 收到 executed 后，先把 output 写入 app.nodeOutputs[nodeId]；
+          // 2) 再调用 node.onExecuted(output)；
+          // 3) 默认 onExecuted 会把 ui.images 写到 node.imgs，从而渲染节点底部缩略图。
+          // 所以这里在原始 onExecuted 之后清空 node.imgs：
+          // - 左侧媒体资产面板仍然能读 app.nodeOutputs；
+          // - 节点底部不再显示重复缩略图；
+          // - 不会影响自动化/历史 JSON 缓存。
+          if (!node.__hrioNoBottomPreviewPatchedV2) {
+            node.__hrioNoBottomPreviewPatchedV2 = true;
+            const _origOnExecuted = typeof node.onExecuted === "function" ? node.onExecuted.bind(node) : null;
+            node.onExecuted = function(message) {
+              let result;
+              try {
+                if (_origOnExecuted) result = _origOnExecuted(message);
+              } finally {
+                try {
+                  this.imgs = null;
+                  this.imageIndex = null;
+                  this.overIndex = null;
+                  this._imageIndex = null;
+                  this._imgs = null;
+                } catch (_e) {}
+
+                try {
+                  const app = getApp();
+                  if (app && app.graph && typeof app.graph.setDirtyCanvas === "function") {
+                    app.graph.setDirtyCanvas(true, false);
+                  } else {
+                    const canvas = getCanvas();
+                    if (canvas && typeof canvas.setDirty === "function") canvas.setDirty(true, false);
+                  }
+                } catch (_e) {}
+              }
+              return result;
+            };
+          }
+          // ─────────────────────────────────────────────────────────────────
+
           setTimeout(() => {
             beautifyTargetNodes();
             ensureAutomationToggleWidget(node);
@@ -2328,7 +2548,7 @@
         <div class="auto-head">
           <div>
             <strong>自动化分组批处理</strong>
-            <span>选择最多 10 个输入项目根目录和 1 个输出根目录；后端递归扫描根目录及子文件夹，按图片文件名数字或父文件夹数字序号横向聚合并发执行。</span>
+            <span>选择最多 10 个输入项目根目录；输出根目录可留空，后端会自动写入 ComfyUI/output/hrio_design_automation。后端递归扫描根目录及子文件夹，按图片文件名数字或父文件夹数字序号横向聚合并发执行。</span>
           </div>
           <button class="auto-close" data-auto-close type="button">×</button>
         </div>
@@ -2347,7 +2567,7 @@
 
             <div class="auto-box">
               <h3>输出根目录</h3>
-              <div class="auto-muted">每个序号组会输出到 output_序号/run_01/，例如 output_001/run_01/front.png。</div>
+              <div class="auto-muted">每个序号组会输出到 output_序号/run_01/，例如 output_001/run_01/front.png。可留空，后端自动使用 ComfyUI/output/hrio_design_automation。</div>
               <div style="margin-top:10px;">
                 <input data-auto-output-root placeholder="D:/输出/hrio_design_runs" />
               </div>
@@ -2378,7 +2598,7 @@
 
             <div class="auto-box">
               <h3>操作</h3>
-              <div class="auto-muted">先预览分组，确认序号聚合正确后，再应用到当前工作流里的 Hrio Design 图像节点与生视频节点。普通图像节点会保存图片，生视频节点会读取最多 10 张参考图并保存 result.mp4。</div>
+              <div class="auto-muted">可先预览分组确认序号；也可以直接应用并运行，后端会按 JSON/input_roots 自行扫描。普通图像节点会上传每组参考图并多次重试生成，生视频节点会上传参考图并轮询视频任务。</div>
               <div class="auto-actions">
                 <button class="auto-btn" data-auto-preview type="button">预览分组</button>
                 <button class="auto-btn secondary" data-auto-copy type="button">复制 JSON</button>
@@ -2407,16 +2627,6 @@
             </div>
           </div>
 
-          <div class="auto-box">
-            <h3>输出历史缓存</h3>
-            <div class="auto-muted">每个自动化序号组执行完成后，会写入插件目录下的 banana_automation_history.json；也会在对应 output_序号/run_01/ 里写 run_info.json / error.txt。</div>
-            <div class="auto-actions">
-              <button class="auto-btn secondary" data-auto-history-refresh type="button">刷新历史</button>
-              <button class="auto-btn danger" data-auto-history-clear type="button">清理历史</button>
-            </div>
-            <div class="auto-muted" data-auto-history-summary>尚未读取历史。</div>
-            <div class="auto-history-list" data-auto-history-list></div>
-          </div>
 
           <div class="auto-bottom">
             <button class="auto-btn secondary" data-auto-close type="button">关闭</button>
@@ -2459,8 +2669,6 @@
       state.automation.saveVideo = !!event.target.checked;
     };
     modal.querySelector("[data-auto-preview]").onclick = () => previewAutomationGroups();
-    modal.querySelector("[data-auto-history-refresh]").onclick = () => fetchAutomationHistory(true);
-    modal.querySelector("[data-auto-history-clear]").onclick = () => clearAutomationHistory();
 
     modal.querySelectorAll("[data-auto-copy]").forEach((btn) => {
       btn.onclick = () => {
@@ -2518,7 +2726,6 @@
     renderAutomationModal();
     document.getElementById(MODAL_ID).classList.add("show");
     scheduleAutomationPreview(260);
-    fetchAutomationHistory(false);
   }
 
   function closeAutomationModal() {
@@ -2834,7 +3041,7 @@
     return {
       enabled: true,
       type: "banana_sequence_group_automation",
-      version: "7.10.0",
+      version: "8.2.2",
       created_at: Date.now(),
       input_roots: (state.automation.inputRoots || []).slice(0, 10),
       output_root: String(state.automation.outputRoot || "").trim(),
@@ -2859,16 +3066,16 @@
   function runAutomationGroupsFromModal(sequence = null) {
     try {
       const payload = buildAutomationPayload();
-      if (!payload.input_roots.length) throw new Error("请先添加输入根目录");
-      if (!payload.output_root) throw new Error("请先选择输出根目录");
+      if (!payload.input_roots.length && !(Array.isArray(payload.preview_groups) && payload.preview_groups.length)) {
+        throw new Error("请先添加输入根目录，或粘贴包含 preview_groups 的自动化 JSON");
+      }
 
       const groups = state.automation.previewGroups || [];
-      if (!groups.length) throw new Error("请先点击预览分组，确认序号后再运行");
 
       if (sequence) {
         const seq = String(sequence);
         const found = groups.some((g) => String(g.sequence || "") === seq);
-        if (!found) throw new Error(`预览列表里没有序号 ${seq}`);
+        if (groups.length && !found) throw new Error(`预览列表里没有序号 ${seq}`);
         payload.run_sequences = [seq];
         payload.target_sequences = [seq];
         payload.sequences = [seq];
@@ -2895,7 +3102,7 @@
       applyAutomationPayload(payload, true, { force: true, fromModal: true });
       closeAutomationModal();
       setLauncherState(sequence ? `已应用并运行序号 ${sequence}` : "已应用并运行全部组", "syncing");
-      queueGraphDebounced(700);
+      queueGraphDebounced(2400);
     } catch (error) {
       setLauncherState(`运行失败：${error.message || error}`, "error");
     }
@@ -2907,6 +3114,7 @@
     if (widget) candidates.push(widget.value);
     if (node && node.properties) {
       candidates.push(node.properties.hrio_design_automation_payload);
+      candidates.push(node.properties.banana_automation_payload);
       candidates.push(node.properties.automation_payload);
       candidates.push(node.properties["自动化映射"]);
     }
@@ -3065,8 +3273,8 @@
     let count = 0;
     const widgets = Array.isArray(node.widgets) ? node.widgets : [];
     widgets.forEach((widget, index) => {
-      const name = normalizeWidgetName(widget?.name || widget?.label || widget?.displayName || widget?.localized_name);
-      if (name !== "automation_payload") return;
+      const name = widget?.name || widget?.label || widget?.displayName || widget?.localized_name;
+      if (!isAutomationWidgetName(name)) return;
       try {
         widget.value = value;
         widget.last_y = 0;
@@ -3081,11 +3289,14 @@
       node.properties = node.properties || {};
       if (value) {
         node.properties.hrio_design_automation_payload = value;
+        node.properties.banana_automation_payload = value;
         node.properties.automation_payload = value;
+        node.properties["自动化映射"] = value;
         node.properties.banana_automation_disabled = false;
         delete node.properties.banana_automation_cleared_at;
       } else {
         delete node.properties.hrio_design_automation_payload;
+        delete node.properties.banana_automation_payload;
         delete node.properties.automation_payload;
         delete node.properties["自动化映射"];
         node.properties.banana_automation_cleared_at = Date.now();
@@ -3118,8 +3329,8 @@
     let changed = false;
     const widgets = Array.isArray(node.widgets) ? node.widgets : [];
     widgets.forEach((widget, index) => {
-      const name = normalizeWidgetName(widget?.name || widget?.label || widget?.displayName || widget?.localized_name);
-      if (name !== "automation_payload") return;
+      const name = widget?.name || widget?.label || widget?.displayName || widget?.localized_name;
+      if (!isAutomationWidgetName(name)) return;
       const value = widget?.value;
       if (shouldClearAutomationValue(value)) {
         widget.value = "";
@@ -3135,6 +3346,7 @@
       if (shouldClearAutomationValue(propValue)) {
         node.properties = props;
         delete node.properties.hrio_design_automation_payload;
+        delete node.properties.banana_automation_payload;
         delete node.properties.automation_payload;
         delete node.properties["自动化映射"];
         changed = true;
@@ -3190,8 +3402,11 @@
     if (!node || !Array.isArray(node.widgets)) return 0;
     let count = 0;
     node.widgets.forEach((widget, index) => {
-      const name = normalizeWidgetName(widget?.name || widget?.label || widget?.displayName || widget?.localized_name);
-      if (name !== normalizedName) return;
+      const rawName = widget?.name || widget?.label || widget?.displayName || widget?.localized_name;
+      const name = normalizeWidgetName(rawName);
+      if (normalizedName === "automation_payload") {
+        if (!isAutomationWidgetName(rawName)) return;
+      } else if (name !== normalizedName) return;
       try {
         widget.value = value;
         if (widget.inputEl) widget.inputEl.value = value;
@@ -3206,11 +3421,14 @@
       node.properties = node.properties || {};
       if (value) {
         node.properties.hrio_design_automation_payload = value;
+        node.properties.banana_automation_payload = value;
         node.properties.automation_payload = value;
+        node.properties["自动化映射"] = value;
         node.properties.banana_automation_disabled = false;
         delete node.properties.banana_automation_cleared_at;
       } else {
         delete node.properties.hrio_design_automation_payload;
+        delete node.properties.banana_automation_payload;
         delete node.properties.automation_payload;
         delete node.properties["自动化映射"];
         node.properties.banana_automation_disabled = true;
@@ -3272,7 +3490,9 @@
   }
 
   function applyAutomationPayload(payload, announce = true, options = {}) {
-    if (!payload || !Array.isArray(payload.input_roots)) return;
+    if (!payload || typeof payload !== "object") return;
+    if (!Array.isArray(payload.input_roots)) payload.input_roots = [];
+    if (!payload.input_roots.length && !Array.isArray(payload.preview_groups)) return;
 
     const now = Date.now();
     const createdAt = Number(payload.created_at || payload.createdAt || 0) || 0;
@@ -3291,24 +3511,47 @@
       localStorage.setItem(AUTOMATION_STORAGE_KEY, JSON.stringify(payload));
     } catch {}
 
-    const nodes = automationWidgetNodes();
-    let appliedCount = 0;
     const payloadText = JSON.stringify(payload, null, 2);
-    nodes.forEach((node) => {
-      try {
-        node.properties = node.properties || {};
-        node.properties.banana_automation_disabled = false;
-        delete node.properties.banana_automation_cleared_at;
-      } catch {}
-      const count = forceSetAutomationWidgetValue(node, payloadText);
-      if (count > 0) {
-        appliedCount += 1;
-      } else if (setWidgetValue(node, ["automation_payload", "自动化映射"], payloadText)) {
-        appliedCount += 1;
-      } else if (syncNodeWidgetValuesByName(node, "automation_payload", payloadText) > 0) {
-        appliedCount += 1;
-      }
-    });
+
+    const writeOnce = () => {
+      // 先美化/清理旧的共同/负面提示词控件，再写入 automation_payload。
+      beautifyTargetNodes();
+      const nodes = automationWidgetNodes();
+      let appliedCount = 0;
+
+      nodes.forEach((node) => {
+        try {
+          node.properties = node.properties || {};
+          node.properties.banana_automation_disabled = false;
+          delete node.properties.banana_automation_cleared_at;
+        } catch {}
+
+        const count = forceSetAutomationWidgetValue(node, payloadText);
+        if (count > 0) {
+          appliedCount += 1;
+        } else if (setWidgetValue(node, ["automation_payload", "自动化映射"], payloadText)) {
+          appliedCount += 1;
+        } else if (syncNodeWidgetValuesByName(node, "automation_payload", payloadText) > 0) {
+          appliedCount += 1;
+        } else {
+          try {
+            node.properties = node.properties || {};
+            node.properties.hrio_design_automation_payload = payloadText;
+            node.properties.banana_automation_payload = payloadText;
+            node.properties.automation_payload = payloadText;
+            node.properties["自动化映射"] = payloadText;
+            appliedCount += 1;
+          } catch {}
+        }
+      });
+
+      return { nodes, appliedCount };
+    };
+
+    const first = writeOnce();
+
+    // ComfyUI 会异步回写右侧属性面板 / widgets_values，多次压入保证入队时节点能读到自动化映射。
+    [80, 180, 360, 620, 1000, 1600, 2400, 3600, 5200].forEach((ms) => setTimeout(writeOnce, ms));
 
     const command = {
       type: "automation",
@@ -3331,8 +3574,8 @@
 
     if (announce) {
       const groupCount = Array.isArray(payload.preview_groups) && payload.preview_groups.length ? payload.preview_groups.length : "未预览";
-      setLauncherState(`自动化已应用：${groupCount} 组 / ${appliedCount} 个节点`, "syncing");
-      setTimeout(() => setLauncherState("自动化已应用到全部可自动化节点", "ok", { passive: true }), 1200);
+      setLauncherState(`自动化已应用：${groupCount} 组 / ${first.appliedCount} 个节点`, "syncing");
+      setTimeout(() => setLauncherState("自动化 JSON 已写入全部可自动化节点后台，等待队列运行", "ok", { passive: true }), 1200);
     }
   }
 
@@ -3344,16 +3587,174 @@
       .replaceAll('"', "&quot;");
   }
 
+
+  function runtimeGroupVisibleVariantKeys(group) {
+    const keys = Array.isArray(group?.visible_variants) && group.visible_variants.length
+      ? group.visible_variants.map((x) => String(x || "")).filter(Boolean)
+      : ((String(group?.output_strategy || "").toLowerCase() === "single_image" || String(group?.node_type || "").includes("single_image"))
+        ? ["variant_a"]
+        : ["variant_a", "variant_b", "variant_c"]);
+    return keys.length ? keys : ["variant_a"];
+  }
+
+  function runtimeGroupMediaItems(group) {
+    const views = group?.views && typeof group.views === "object" ? group.views : {};
+    const slotMap = { variant_a: "front.png", variant_b: "side.png", variant_c: "back.png", front: "front.png", side: "side.png", back: "back.png" };
+    const media = [];
+    runtimeGroupVisibleVariantKeys(group).forEach((key) => {
+      const item = views[key] || null;
+      const url = String(item?.view_url || item?.url || item?.image || "").trim();
+      const mediaRef = item?.media && typeof item.media === "object" ? item.media : {};
+      if (!url && !mediaRef.path && !mediaRef.local_path) return;
+      const slot = String(mediaRef.slot || mediaRef.filename || mediaRef.name || slotMap[key] || `${key}.png`);
+      media.push({
+        slot,
+        kind: "image",
+        view_url: url,
+        url,
+        path: String(mediaRef.path || mediaRef.local_path || ""),
+        local_path: String(mediaRef.local_path || mediaRef.path || ""),
+        filename: String(mediaRef.filename || mediaRef.name || slot),
+      });
+    });
+    return media;
+  }
+
+  function normalizeHistoryStableText(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\\/g, "/")
+      .replace(/\?.*$/, "")
+      .toLowerCase();
+  }
+
+  function historyStableMediaKey(item) {
+    const media = normalizeHistoryMedia(item);
+    const keys = [];
+    media.forEach((m) => {
+      const value = normalizeHistoryStableText(m.local_path || m.path || m.view_url || m.url || m.filename || m.name || "");
+      if (value) keys.push(value);
+    });
+    return keys.sort().join("|");
+  }
+
+  function historyStableKey(item) {
+    if (!item || typeof item !== "object") return "";
+    const type = normalizeHistoryStableText(item.node_type || item.type || "");
+    const sequence = normalizeHistoryStableText(item.sequence || sequenceFromRuntimeGroup(item) || "");
+    const outputDir = normalizeHistoryStableText(item.output_dir || "");
+    const mediaKey = historyStableMediaKey(item);
+    const runId = normalizeHistoryStableText(item.run_id || item.cache_key || item.key || "");
+
+    // 自动化/最近生成最容易重复：同一个输出目录 + 同一个序号 + 同一种节点，只保留最新一条。
+    if (outputDir && sequence) return `out:${type}:${sequence}:${outputDir}`;
+
+    // 视频或手动生成没有 output_dir 时，用媒体路径/URL 去重。
+    if (mediaKey) return `media:${type}:${sequence}:${mediaKey}`;
+
+    // 兜底再使用后端 run_id/key。
+    if (runId) return `run:${runId}`;
+
+    return `fallback:${type}:${sequence}:${normalizeHistoryStableText(item.created_at_ms || item.created_at || "")}`;
+  }
+
+  function historySortMs(item) {
+    const raw = Number(item?.created_at_ms || item?.updated_at_ms || 0);
+    return Number.isFinite(raw) ? raw : 0;
+  }
+
+  function dedupeUnifiedHistoryItems(items) {
+    const rows = Array.isArray(items) ? items.filter((x) => x && typeof x === "object") : [];
+    const sorted = rows.slice().sort((a, b) => historySortMs(b) - historySortMs(a));
+    const seen = new Set();
+    const out = [];
+    sorted.forEach((item) => {
+      const key = historyStableKey(item);
+      if (key && seen.has(key)) return;
+      if (key) seen.add(key);
+      out.push(item);
+    });
+    return out;
+  }
+
+  function normalizeUnifiedHistoryItems(data) {
+    if (Array.isArray(data?.items)) return dedupeUnifiedHistoryItems(data.items.slice().reverse());
+    const groups = Array.isArray(data?.groups) ? data.groups.slice() : [];
+    const videos = Array.isArray(data?.videos) ? data.videos.slice() : [];
+    const items = [];
+    groups.forEach((group) => {
+      if (!group || typeof group !== "object") return;
+      const media = runtimeGroupMediaItems(group);
+      items.push({
+        run_id: String(group.run_id || group.cache_key || ""),
+        sequence: String(group.sequence || ""),
+        node_type: String(group.node_type || (String(group.output_strategy || "").toLowerCase() === "single_image" ? "normal_single_image" : "normal_three_view")),
+        type: "image",
+        ok: group.has_error ? false : true,
+        error: group.has_error ? "部分方案需要重跑" : "",
+        created_at: group.created_at || (group.updated_at_ms ? new Date(Number(group.updated_at_ms)).toLocaleString() : ""),
+        created_at_ms: Number(group.created_at_ms || group.updated_at_ms || 0),
+        output_dir: String(group.output_dir || ""),
+        model: String(group.model || ""),
+        display_model: String(group.model || ""),
+        input_image_count: Number(group.input_image_count || 0),
+        uploaded_image_count: Number(group.uploaded_image_count || 0),
+        source_images: Array.isArray(group.source_images) ? group.source_images : [],
+        media,
+        output_files: {},
+        template_display: String(group.template_display || group.mode_display || ""),
+      });
+    });
+    videos.forEach((video) => {
+      if (!video || typeof video !== "object") return;
+      const url = String(video.view_url || video.url || "").trim();
+      items.push({
+        run_id: String(video.run_id || video.key || ""),
+        sequence: String(video.sequence || ""),
+        node_type: "video",
+        type: "video",
+        ok: video.has_error ? false : true,
+        error: String(video.error || ""),
+        created_at: video.created_at || (video.updated_at_ms ? new Date(Number(video.updated_at_ms)).toLocaleString() : ""),
+        created_at_ms: Number(video.created_at_ms || video.updated_at_ms || 0),
+        output_dir: String(video.output_dir || ""),
+        model: String(video.model || ""),
+        display_model: String(video.model || ""),
+        input_image_count: 0,
+        uploaded_image_count: 0,
+        source_images: [],
+        media: [{
+          slot: String(video.filename || "result.mp4"),
+          kind: "video",
+          view_url: url,
+          url,
+          path: String(video.local_path || ""),
+          local_path: String(video.local_path || ""),
+          filename: String(video.filename || "result.mp4"),
+        }],
+        output_files: {},
+      });
+    });
+    items.sort((a, b) => Number(b.created_at_ms || 0) - Number(a.created_at_ms || 0));
+    return dedupeUnifiedHistoryItems(items);
+  }
+
   async function fetchAutomationHistory(announce = false) {
     try {
       const data = await getJson(AUTOMATION_HISTORY_ROUTE);
-      state.automation.historyItems = Array.isArray(data.items) ? data.items.slice().reverse() : [];
+      const items = normalizeUnifiedHistoryItems(data);
+      state.automation.historyItems = items;
       state.automation.historyLoadedAt = Date.now();
-      renderAutomationHistory();
-      if (announce) setLauncherState(`已读取历史：${state.automation.historyItems.length} 条`, "ok");
+      state.history.items = items;
+      state.history.loadedAt = Date.now();
+      renderHistoryModal(items);
+      if (announce) setLauncherState(`已读取统一生成历史：${items.length} 条`, "ok");
+      return items;
     } catch (error) {
       console.warn("[Hrio Design] fetch history failed:", error);
       if (announce) setLauncherState(`历史读取失败：${error.message || error}`, "error");
+      renderHistoryModal([], error);
+      return [];
     }
   }
 
@@ -3361,44 +3762,237 @@
     try {
       await postJson(AUTOMATION_HISTORY_CLEAR_ROUTE, {});
       state.automation.historyItems = [];
+      state.history.items = [];
       state.automation.historyLoadedAt = Date.now();
-      renderAutomationHistory();
-      setLauncherState("自动化历史已清理", "ok");
+      state.history.loadedAt = Date.now();
+      renderHistoryModal([]);
+      setLauncherState("统一结果 JSON 已清理", "ok");
     } catch (error) {
       console.warn("[Hrio Design] clear history failed:", error);
       setLauncherState(`历史清理失败：${error.message || error}`, "error");
     }
   }
 
-  function renderAutomationHistory() {
-    const modal = document.getElementById(MODAL_ID);
-    if (!modal) return;
-    const list = modal.querySelector("[data-auto-history-list]");
-    const summary = modal.querySelector("[data-auto-history-summary]");
-    const items = state.automation.historyItems || [];
-    if (summary) {
-      summary.textContent = items.length ? `已缓存 ${items.length} 条历史，最新记录在最上方。` : "暂无历史缓存。";
+  function createHistoryModal() {
+    injectStyle();
+    let modal = document.getElementById(HISTORY_MODAL_ID);
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = HISTORY_MODAL_ID;
+    modal.innerHTML = `
+      <div class="history-card">
+        <div class="history-head">
+          <div>
+            <strong>Hrio Design｜全部生成历史</strong>
+            <span>图片、最近生成、自动化生成统一读取同一个 JSON 缓存；历史单独弹窗查看。</span>
+          </div>
+          <div class="history-actions">
+            <button class="history-btn" data-history-refresh type="button">刷新</button>
+            <button class="history-btn" data-history-clear type="button">清理历史</button>
+            <button class="history-close" data-history-close type="button">×</button>
+          </div>
+        </div>
+        <div class="history-body" data-history-list>
+          <div class="history-empty">正在读取生成历史...</div>
+        </div>
+      </div>
+    `;
+
+    const close = () => modal.classList.remove("show");
+    modal.querySelector("[data-history-close]").onclick = close;
+    modal.querySelector("[data-history-refresh]").onclick = () => refreshHistoryModal(true);
+    modal.querySelector("[data-history-clear]").onclick = () => clearAutomationHistory();
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) close();
+    });
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function normalizeHistoryMedia(item) {
+    const media = [];
+    const seen = new Set();
+    const pushMedia = (m) => {
+      if (!m || typeof m !== "object") return;
+      const key = normalizeHistoryStableText(m.local_path || m.path || m.view_url || m.url || m.source || m.filename || m.name || m.slot || "");
+      if (key && seen.has(key)) return;
+      if (key) seen.add(key);
+      media.push(m);
+    };
+
+    if (Array.isArray(item?.media)) {
+      item.media.forEach(pushMedia);
     }
+
+    const files = item?.output_files && typeof item.output_files === "object" ? item.output_files : {};
+    Object.entries(files).forEach(([slot, value]) => {
+      if (!value) return;
+      const key = normalizeHistoryStableText(value);
+      if (key && seen.has(key)) return;
+      const lower = String(value).toLowerCase();
+      pushMedia({ slot, path: String(value), kind: lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".webm") || lower.endsWith(".m4v") ? "video" : "image" });
+    });
+    return media;
+  }
+
+  function renderHistoryMedia(media) {
+    const items = Array.isArray(media) ? media : [];
+    if (!items.length) return `<div class="history-empty" style="padding:10px;">无可预览媒体</div>`;
+    return `<div class="history-media">${items.slice(0, 8).map((m) => {
+      const url = String(m.view_url || m.url || "").trim();
+      const path = String(m.path || m.local_path || m.source || m.name || m.filename || "");
+      const title = escapeHtml(`${m.slot || m.kind || "media"} · ${path}`);
+      const isVideo = String(m.kind || "").toLowerCase() === "video" || /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url || path);
+      if (url && isVideo) return `<video class="history-thumb" src="${escapeHtml(url)}" title="${title}" controls preload="metadata"></video>`;
+      if (url) return `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img class="history-thumb" src="${escapeHtml(url)}" title="${title}" /></a>`;
+      return `<div class="history-empty" style="width:160px;padding:8px;">${escapeHtml(m.slot || m.kind || "文件")}<div class="history-path">${escapeHtml(path)}</div></div>`;
+    }).join("")}</div>`;
+  }
+
+  function historyNodeTypeLabel(type) {
+    const raw = String(type || "");
+    if (raw.includes("single_image")) return "普通单图";
+    if (raw.includes("three_view")) return "三方案";
+    if (raw.includes("video")) return "视频";
+    return raw || "生成";
+  }
+
+  function buildAutomationPayloadFromHistoryItem(item) {
+    const seq = String(item?.sequence || sequenceFromRuntimeGroup(item) || "001");
+    const sourceImages = Array.isArray(item?.source_images) ? item.source_images.filter(Boolean).map(String) : [];
+    if (!sourceImages.length && item?.rerun_payload && typeof item.rerun_payload === "object") {
+      return Object.assign({}, item.rerun_payload, {
+        enabled: true,
+        created_at: Date.now(),
+        run_sequences: [seq],
+        target_sequences: [seq],
+        sequences: [seq],
+        run_sequence: seq,
+        selected_sequence: seq,
+        sequence: seq,
+        group_concurrency: 1,
+        run_mode: "single_group",
+        run_view: "all",
+      });
+    }
+    if (!sourceImages.length) throw new Error("这条记录没有 source_images，通常是手动生成结果，无法自动重跑；请直接在节点或设计师面板重新生成。");
+    const previewGroup = {
+      sequence: seq,
+      output_dir: "",
+      present_root_count: sourceImages.length,
+      expected_root_count: sourceImages.length,
+      preview_count: sourceImages.length,
+      items: sourceImages.map((path, index) => ({
+        root_index: index,
+        root_path: "",
+        source_type: "history_source_image",
+        file_name: String(path).split(/[\\/]/).pop() || `image_${index + 1}.png`,
+        image_path: path,
+        sequence: seq,
+      })),
+    };
+    return {
+      enabled: true,
+      type: "banana_sequence_group_automation",
+      version: "8.2.2",
+      created_at: Date.now(),
+      input_roots: [],
+      output_root: "",
+      group_concurrency: 1,
+      max_input_roots: 10,
+      max_images_per_group: Math.min(10, Math.max(1, sourceImages.length)),
+      extract_rule: "history_exact_source_images",
+      collect_images_mode: "history_preview_group_exact",
+      collect_mode: "history_preview_group_exact",
+      save_images: true,
+      save_video: String(item?.node_type || "").includes("video"),
+      video_filename: "result.mp4",
+      image_filenames: { front: "front.png", side: "side.png", back: "back.png", single: "single.png" },
+      preview_groups: [previewGroup],
+      run_sequences: [seq],
+      target_sequences: [seq],
+      sequences: [seq],
+      run_sequence: seq,
+      selected_sequence: seq,
+      sequence: seq,
+      run_mode: "single_group",
+      run_view: "all",
+      force_apply_token: `history:${seq}:${Date.now()}`,
+    };
+  }
+
+  function rerunHistoryItem(index) {
+    try {
+      const item = state.history.items[Number(index)];
+      if (!item) throw new Error("历史记录不存在或已刷新");
+      const payload = buildAutomationPayloadFromHistoryItem(item);
+      applyAutomationPayload(payload, true, { force: true, fromModal: true, fromHistory: true });
+      const modal = document.getElementById(HISTORY_MODAL_ID);
+      if (modal) modal.classList.remove("show");
+      setLauncherState(`已从历史重跑序号 ${payload.sequence || ""}`.trim(), "syncing");
+      queueGraphDebounced(2400);
+    } catch (error) {
+      setLauncherState(`历史重跑失败：${error.message || error}`, "error");
+    }
+  }
+
+function renderHistoryModal(items, error = null) {
+    const modal = document.getElementById(HISTORY_MODAL_ID);
+    if (!modal) return;
+    const list = modal.querySelector("[data-history-list]");
     if (!list) return;
-    if (!items.length) {
-      list.innerHTML = `<div class="auto-muted">暂无自动化输出历史。</div>`;
+    if (error) {
+      list.innerHTML = `<div class="history-empty">读取历史失败：${escapeHtml(error.message || error)}</div>`;
       return;
     }
-    list.innerHTML = items.slice(0, 80).map((item) => {
+    const rows = dedupeUnifiedHistoryItems(Array.isArray(items) ? items : [])
+      .filter((item) => Number(item.input_image_count || 0) > 0 || Number(item.uploaded_image_count || 0) > 0);
+    if (!rows.length) {
+      list.innerHTML = `<div class="history-empty">暂无生成历史。现在手动生成、最近生成、自动化生成都会写入同一个 JSON 缓存，并统一在这里查看。</div>`;
+      return;
+    }
+    list.innerHTML = rows.slice(0, 160).map((item, index) => {
       const ok = item.ok !== false;
-      const seq = escapeHtml(item.sequence || "-");
-      const type = escapeHtml(item.node_type || item.type || "image");
-      const when = escapeHtml(item.created_at || "");
+      const seq = escapeHtml(item.sequence || sequenceFromRuntimeGroup(item) || "-");
+      const type = historyNodeTypeLabel(item.node_type || item.type || "");
+      const when = escapeHtml(item.created_at || (item.created_at_ms ? new Date(Number(item.created_at_ms)).toLocaleString() : ""));
       const out = escapeHtml(item.output_dir || "");
-      const msg = ok ? `${type} · ${out}` : `${type} · ${item.error || "失败"}`;
+      const model = escapeHtml(item.display_model || item.model || "");
+      const media = normalizeHistoryMedia(item);
+      const status = ok ? `<span class="history-status-ok">成功</span>` : `<span class="history-status-bad">失败：${escapeHtml(item.error || "未知错误")}</span>`;
       return `
-        <div class="auto-history-item" title="${out}">
-          <div class="${ok ? "auto-history-ok" : "auto-history-bad"}">${ok ? "成功" : "失败"}</div>
-          <div class="auto-history-main"><strong>序号 ${seq} · ${escapeHtml(msg)}</strong><span>${when}</span></div>
-          <button class="auto-btn secondary" style="height:28px;padding:0 8px;" data-auto-run-group="${seq}" type="button">重跑</button>
+        <div class="history-item">
+          ${renderHistoryMedia(media)}
+          <div class="history-main">
+            <div class="history-title">序号 ${seq} · ${escapeHtml(type)} · ${status}</div>
+            <div class="history-meta">${when}${model ? ` · ${model}` : ""}</div>
+            <div class="history-meta">输入 ${escapeHtml(item.input_image_count || 0)} 张 · 上传 ${escapeHtml(item.uploaded_image_count || 0)} 张</div>
+            <div class="history-path">${out}</div>
+          </div>
+          <div class="history-actions">
+            <button class="history-btn" data-history-rerun="${index}" type="button">重跑本组</button>
+          </div>
         </div>
       `;
     }).join("");
+    list.querySelectorAll("[data-history-rerun]").forEach((btn) => {
+      btn.onclick = () => rerunHistoryItem(btn.getAttribute("data-history-rerun"));
+    });
+  }
+
+  async function refreshHistoryModal(announce = false) {
+    const modal = createHistoryModal();
+    const list = modal.querySelector("[data-history-list]");
+    if (list) list.innerHTML = `<div class="history-empty">正在读取生成历史...</div>`;
+    const items = await fetchAutomationHistory(announce);
+    renderHistoryModal(items);
+  }
+
+  function openHistoryModal() {
+    const modal = createHistoryModal();
+    modal.classList.add("show");
+    refreshHistoryModal(false);
   }
 
   function exposeDebugApi() {
@@ -3413,6 +4007,7 @@
       readLastStoredCommand,
       clearAutomationPayloadFromNodes,
       openVideoModal,
+      openHistoryModal,
       getGraph,
       resetFloatPosition: () => {
         try {
@@ -3430,8 +4025,8 @@
   }
 
   function init() {
-    if (window.__HRIO_DESIGN_BRIDGE_V816__) return;
-    window.__HRIO_DESIGN_BRIDGE_V816__ = true;
+    if (window.__HRIO_DESIGN_BRIDGE_V822__) return;
+    window.__HRIO_DESIGN_BRIDGE_V822__ = true;
 
     createLauncher();
     setupCommandBridge();
